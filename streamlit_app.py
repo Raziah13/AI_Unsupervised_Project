@@ -4,7 +4,7 @@ if os.path.exists('streamlit_app.py'):
     os.remove('streamlit_app.py')
 
 with open('streamlit_app.py', 'w') as f:
-    f.write('import streamlit as st
+    f.write('''import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
