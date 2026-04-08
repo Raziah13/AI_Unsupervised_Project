@@ -30,6 +30,8 @@ page = st.sidebar.selectbox(
 if uploaded_file:
     # Load data
     df = pd.read_csv(uploaded_file)
+    st.subheader("Dataset Preview")
+    st.dataframe(df.head())
     
     # Preprocessing
     df_clean = df.copy()
@@ -123,40 +125,30 @@ if uploaded_file:
                 if income_mean > 70 and spending_mean > 60:
                     segment_name = "VIP Premium Customers"
                     icon = "👑"
-                    description = "High income, high spending"
                 elif income_mean > 70 and spending_mean < 40:
-                    segment_name = "Value Shoppers"
+                    segment_name = "Smart Value Shoppers"
                     icon = "💰"
-                    description = "High income, careful spending"
                 elif income_mean < 40 and spending_mean > 60:
-                    segment_name = "Young Enthusiasts"
+                    segment_name = "Aspiring Trendsetters"
                     icon = "🎯"
-                    description = "Budget conscious but love spending"
                 elif income_mean < 40 and spending_mean < 40:
-                    segment_name = "Frugal Customers"
+                    segment_name = "Practical Frugal"
                     icon = "🛡️"
-                    description = "Low income, careful spenders"
                 elif age_mean < 30 and spending_mean > 60:
-                    segment_name = "Trendy Youth"
+                    segment_name = "Young Trend Hunters"
                     icon = "🔥"
-                    description = "Young and active spenders"
                 elif age_mean > 50 and income_mean > 60:
-                    segment_name = "Established Professionals"
+                    segment_name = "Established Affluents"
                     icon = "💼"
-                    description = "Mature, stable customers"
                 elif age_mean > 50 and spending_mean < 40:
-                    segment_name = "Retirement Savers"
+                    segment_name = "Comfort Keepers"
                     icon = "🏠"
-                    description = "Senior, cautious spenders"
                 else:
                     segment_name = "Regular Customers"
                     icon = "⭐"
-                    description = "Balanced characteristics"
                 
                 segment_profiles.append({
-                    'Icon': icon,
-                    'Segment Name': segment_name,
-                    'Description': description,
+                    'Segment': f"{icon} {segment_name}",
                     'Size': size,
                     'Size %': f"{size/len(st.session_state.df_clean)*100:.1f}%",
                     'Avg Age': f"{age_mean:.0f} years",
@@ -171,7 +163,7 @@ if uploaded_file:
             st.subheader(" Segment Size Distribution")
             fig2, ax2 = plt.subplots(figsize=(8, 6))
             sizes = [p['Size'] for p in segment_profiles]
-            labels = [p['Segment Name'] for p in segment_profiles]
+            labels = [p['Segment'] for p in segment_profiles]
             colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#D4A5A5', '#9B59B6', '#3498DB']
             wedges, texts, autotexts = ax2.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors[:len(sizes)])
             ax2.set_title('Customer Segment Distribution')
@@ -255,7 +247,7 @@ if uploaded_file:
                 'Number of Segments': [st.session_state.kmeans_k, st.session_state.dbscan_clusters],
                 'Noise Points': ['None (0)', f"{st.session_state.dbscan_noise} customers"],
                 'Best For': ['Spherical clusters, balanced sizes', 'Irregular shapes, outlier detection'],
-                'Pros': ['Easy to interpret, stable results', 'No need to specify k, finds noise'],
+                'Pros': ['Easy to interpret, stable results', 'No need to choose k, finds noise'],
                 'Cons': ['Requires choosing k, sensitive to outliers', 'Parameter sensitive, can find too many noise']
             }
             
@@ -266,15 +258,15 @@ if uploaded_file:
             st.subheader(" Recommendation")
             
             if st.session_state.kmeans_sil > 0.5 and st.session_state.dbscan_sil > 0.5:
-                st.success(" Both algorithms perform well! Consider:")
+                st.success("Both algorithms perform well! Consider:")
                 st.write("- Use **K-Means** if you want equal-sized segments")
                 st.write("- Use **DBSCAN** if you want to identify unique/outlier customers")
             elif st.session_state.kmeans_sil > st.session_state.dbscan_sil:
-                st.success(" **K-Means** performs better for your data")
+                st.success("**K-Means** performs better for your data")
                 st.write("- Creates clearly separated segments")
                 st.write("- Good for standard customer grouping")
             else:
-                st.success(" **DBSCAN** performs better for your data")
+                st.success("**DBSCAN** performs better for your data")
                 st.write("- Better at finding natural groupings")
                 st.write("- Can identify unusual customer patterns")
             
@@ -312,9 +304,9 @@ if uploaded_file:
             st.pyplot(fig)
             
         else:
-            st.warning(" Please run both K-Means and DBSCAN first (go to their tabs and click Run)")
-            st.info("1. Go to 'K-Means Clustering' tab and click 'Run K-Means'")
-            st.info("2. Go to 'DBSCAN Clustering' tab and click 'Run DBSCAN'")
+            st.warning("Please run both K-Means and DBSCAN first")
+            st.info("1. Go to 'K-Means Clustering' page and click 'Run K-Means'")
+            st.info("2. Go to 'DBSCAN Clustering' page and click 'Run DBSCAN'")
             st.info("3. Then come back here to see comparison")
     
     # ============================================
@@ -324,7 +316,7 @@ if uploaded_file:
         st.header(" Customer Segment Profiles")
         
         if 'kmeans_labels' in st.session_state:
-            st.subheader(" Understanding Your Customer Segments")
+            st.subheader("Understanding Your Customer Segments")
             
             # Create detailed profiles with meaningful names
             segment_details = []
@@ -347,88 +339,98 @@ if uploaded_file:
                 
                 # Create meaningful segment name and description
                 if income_mean > 70 and spending_mean > 60:
-                    segment_name = "👑 VIP Premium Customers"
+                    segment_name = "VIP Premium Customers"
+                    icon = "👑"
                     marketing = "Offer exclusive products, early access, VIP events"
                     products = "Luxury items, premium services, bundles"
                     channel = "Email, personal calls, exclusive app access"
                 elif income_mean > 70 and spending_mean < 40:
-                    segment_name = "💰 Smart Value Shoppers"
+                    segment_name = "Smart Value Shoppers"
+                    icon = "💰"
                     marketing = "Highlight discounts, cashback, value deals"
                     products = "Mid-range products, bulk discounts"
                     channel = "Email newsletters, coupon apps"
                 elif income_mean < 40 and spending_mean > 60:
-                    segment_name = "🎯 Aspiring Trendsetters"
+                    segment_name = "Aspiring Trendsetters"
+                    icon = "🎯"
                     marketing = "Social media campaigns, influencer marketing"
                     products = "Trendy items, affordable luxuries"
                     channel = "Instagram, TikTok, mobile apps"
                 elif income_mean < 40 and spending_mean < 40:
-                    segment_name = "🛡️ Practical Frugal"
+                    segment_name = "Practical Frugal"
+                    icon = "🛡️"
                     marketing = "Focus on essential needs, basic value"
                     products = "Essential items, budget-friendly options"
                     channel = "SMS, basic email, store flyers"
                 elif age_mean < 30 and spending_mean > 60:
-                    segment_name = "🔥 Young Trend Hunters"
+                    segment_name = "Young Trend Hunters"
+                    icon = "🔥"
                     marketing = "Flash sales, limited editions, viral marketing"
                     products = "New arrivals, seasonal items, accessories"
                     channel = "Social media, influencers, apps"
                 elif age_mean > 50 and income_mean > 60:
-                    segment_name = "💼 Established Affluents"
+                    segment_name = "Established Affluents"
+                    icon = "💼"
                     marketing = "Quality focus, reliability, service excellence"
                     products = "Premium brands, long-lasting goods"
                     channel = "Email, phone, physical stores"
                 elif age_mean > 50 and spending_mean < 40:
-                    segment_name = "🏠 Comfort Keepers"
+                    segment_name = "Comfort Keepers"
+                    icon = "🏠"
                     marketing = "Trust, familiarity, loyalty rewards"
                     products = "Household essentials, familiar brands"
                     channel = "Traditional media, direct mail, phone"
                 else:
-                    segment_name = "⭐ Balanced Regulars"
+                    segment_name = "Regular Customers"
+                    icon = "⭐"
                     marketing = "Mix of offers, loyalty program, referrals"
                     products = "Variety of products, bundles"
                     channel = "Multi-channel approach"
                 
                 segment_details.append({
-                    'Segment': segment_name,
-                    'Size': f"{size} customers ({percentage:.1f}%)",
-                    'Age': f"{age_mean:.0f} years",
-                    'Income': f"${income_mean:.0f}K",
-                    'Spending': f"{spending_mean:.0f}/100",
-                    'Gender': f"{female_pct:.0f}% Female / {male_pct:.0f}% Male",
-                    'Marketing Focus': marketing,
-                    'Product Focus': products,
-                    'Channel Focus': channel
+                    'icon': icon,
+                    'name': segment_name,
+                    'size': size,
+                    'pct': percentage,
+                    'age': age_mean,
+                    'income': income_mean,
+                    'spending': spending_mean,
+                    'female_pct': female_pct,
+                    'male_pct': male_pct,
+                    'marketing': marketing,
+                    'products': products,
+                    'channel': channel
                 })
             
             # Display profiles
             for seg in segment_details:
-                with st.expander(f"{seg['Segment']} - {seg['Size']}"):
+                with st.expander(f"{seg['icon']} {seg['name']} - {seg['size']} customers ({seg['pct']:.1f}%)"):
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write("**Customer Characteristics:**")
-                        st.write(f"- Age: {seg['Age']}")
-                        st.write(f"- Income: {seg['Income']}")
-                        st.write(f"- Spending Score: {seg['Spending']}")
-                        st.write(f"- Gender: {seg['Gender']}")
+                        st.write(f"- Age: {seg['age']:.0f} years")
+                        st.write(f"- Income: ${seg['income']:.0f}K")
+                        st.write(f"- Spending Score: {seg['spending']:.0f}/100")
+                        st.write(f"- Gender: {seg['female_pct']:.0f}% Female / {seg['male_pct']:.0f}% Male")
                     
                     with col2:
                         st.write("**Marketing Strategy:**")
-                        st.write(f"- Focus: {seg['Marketing Focus']}")
-                        st.write(f"- Products: {seg['Product Focus']}")
-                        st.write(f"- Channels: {seg['Channel Focus']}")
+                        st.write(f"- Focus: {seg['marketing']}")
+                        st.write(f"- Products: {seg['products']}")
+                        st.write(f"- Channels: {seg['channel']}")
             
             # Summary statistics
             st.subheader(" Quick Summary")
             
             # Find key insights
-            all_segments = segment_details
-            largest = max(all_segments, key=lambda x: int(x['Size'].split()[0]))
-            highest_spending = max(all_segments, key=lambda x: int(x['Spending'].split('/')[0]))
-            highest_income = max(all_segments, key=lambda x: int(x['Income'].replace('$', '').replace('K', '')))
+            largest = max(segment_details, key=lambda x: x['size'])
+            highest_spending = max(segment_details, key=lambda x: x['spending'])
+            highest_income = max(segment_details, key=lambda x: x['income'])
             
             col1, col2, col3 = st.columns(3)
-            col1.info(f"**Largest Segment**\n\n{largest['Segment']}\n{largest['Size']}")
-            col2.success(f"**Highest Spenders**\n\n{highest_spending['Segment']}\nSpending: {highest_spending['Spending']}")
-            col3.warning(f"**Highest Income**\n\n{highest_income['Segment']}\nIncome: {highest_income['Income']}")
+            col1.info(f"**Largest Segment**\n\n{largest['icon']} {largest['name']}\n{largest['size']} customers")
+            col2.success(f"**Highest Spenders**\n\n{highest_spending['icon']} {highest_spending['name']}\nSpending: {highest_spending['spending']:.0f}/100")
+            col3.warning(f"**Highest Income**\n\n{highest_income['icon']} {highest_income['name']}\nIncome: ${highest_income['income']:.0f}K")
             
             # Download
             st.subheader(" Export Data")
@@ -436,7 +438,7 @@ if uploaded_file:
             st.download_button("Download Customer Segmentation Results", csv, "segmentation_results.csv")
             
         else:
-            st.warning(" Please run K-Means clustering first")
+            st.warning("Please run K-Means clustering first")
             st.info("Go to 'K-Means Clustering' page and click 'Run K-Means'")
 
 else:
@@ -463,4 +465,4 @@ else:
     """)
 ''')
 
-print(" Streamlit app created with dropdown menu and meaningful segment names!")
+print(" Streamlit app created successfully!")
