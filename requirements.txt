@@ -1,9 +1,6 @@
-with open('requirements.txt', 'w') as f:
-    f.write("streamlit\n")
-    f.write("pandas\n")
-    f.write("numpy\n")
-    f.write("matplotlib\n")
-    f.write("seaborn\n")
-    f.write("scikit-learn\n")
-
-print(" requirements.txt created!")
+streamlit
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
