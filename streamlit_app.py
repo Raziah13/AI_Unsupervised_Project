@@ -1,4 +1,4 @@
-# COMPLETELY WORKING VERSION - Fixed f-string errors
+# COMPLETELY WORKING VERSION - All strings on single lines
 import os
 
 if os.path.exists('streamlit_app.py'):
@@ -68,7 +68,6 @@ if uploaded_file:
                 cal_score = calinski_harabasz_score(X_scaled, labels)
                 dav_score = davies_bouldin_score(X_scaled, labels)
                 
-                # Store results
                 st.session_state.kmeans_result = {
                     'labels': labels,
                     'k': k_value,
@@ -79,7 +78,6 @@ if uploaded_file:
                 }
                 st.rerun()
         
-        # Display results if they exist
         if st.session_state.kmeans_result is not None:
             res = st.session_state.kmeans_result
             
@@ -149,7 +147,7 @@ if uploaded_file:
                 })
             st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
         else:
-            st.info("👈 Click the 'Run K-Means' button to see results")
+            st.info("Click the 'Run K-Means' button to see results")
     
     # ========== DBSCAN CLUSTERING ==========
     elif page == "DBSCAN Clustering":
@@ -180,7 +178,6 @@ if uploaded_file:
                 }
                 st.rerun()
         
-        # Display results if they exist
         if st.session_state.dbscan_result is not None:
             res = st.session_state.dbscan_result
             
@@ -254,11 +251,12 @@ if uploaded_file:
                 st.dataframe(pd.DataFrame(dbscan_summary), use_container_width=True)
                 
                 if res['noise'] > 0:
-                    st.warning(f"Noise Points: {res['noise']} customers ({res['noise']/len(df_clean)*100:.1f}%) could not be assigned to any cluster.")
+                    noise_pct = res['noise']/len(df_clean)*100
+                    st.warning(f"Noise Points: {res['noise']} customers ({noise_pct:.1f}%) could not be assigned to any cluster.")
             else:
                 st.warning("Not enough clusters found. Try adjusting eps and min_samples.")
         else:
-            st.info("👈 Click the 'Run DBSCAN' button to see results")
+            st.info("Click the 'Run DBSCAN' button to see results")
     
     # ========== METHOD COMPARISON ==========
     elif page == "Method Comparison":
@@ -416,13 +414,13 @@ if uploaded_file:
             youngest = min(segment_details, key=lambda x: x['age'])
             oldest = max(segment_details, key=lambda x: x['age'])
             
-            # Fixed: No multi-line f-strings
+            # Fixed: All strings on single lines, no newlines inside quotes
             c1, c2, c3, c4, c5 = st.columns(5)
-            c1.info("**Largest**\n\n" + largest['name'] + "\n" + str(largest['size']) + " customers")
-            c2.success("**Biggest Spenders**\n\n" + highest_spending['name'] + "\nScore: " + str(round(highest_spending['spending'], 0)) + "/100")
-            c3.warning("**Highest Income**\n\n" + highest_income['name'] + "\n$" + str(round(highest_income['income'], 0)) + "K")
-            c4.info("**Youngest**\n\n" + youngest['name'] + "\n" + str(round(youngest['age'], 0)) + " years")
-            c5.success("**Oldest**\n\n" + oldest['name'] + "\n" + str(round(oldest['age'], 0)) + " years")
+            c1.info("**Largest Segment** - " + largest['name'] + " (" + str(largest['size']) + " customers)")
+            c2.success("**Biggest Spenders** - " + highest_spending['name'] + " (Score: " + str(round(highest_spending['spending'], 0)) + "/100)")
+            c3.warning("**Highest Income** - " + highest_income['name'] + " ($" + str(round(highest_income['income'], 0)) + "K)")
+            c4.info("**Youngest Segment** - " + youngest['name'] + " (" + str(round(youngest['age'], 0)) + " years)")
+            c5.success("**Oldest Segment** - " + oldest['name'] + " (" + str(round(oldest['age'], 0)) + " years)")
             
             st.subheader('Export Data')
             csv = df_profiles.to_csv(index=False).encode('utf-8')
