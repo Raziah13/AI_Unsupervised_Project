@@ -1,4 +1,4 @@
-# COMPLETELY WORKING VERSION - Slider remembers your value
+# COMPLETELY WORKING VERSION - All strings on single lines
 import os
 
 if os.path.exists('streamlit_app.py'):
@@ -24,19 +24,14 @@ st.sidebar.subheader("Navigation")
 page = st.sidebar.selectbox("Choose Analysis Type", 
     ["K-Means Clustering", "DBSCAN Clustering", "Method Comparison", "Customer Profiling"])
 
-# Initialize session state
+# Initialize all session state variables at the beginning
 if 'kmeans_result' not in st.session_state:
     st.session_state.kmeans_result = None
 if 'dbscan_result' not in st.session_state:
     st.session_state.dbscan_result = None
-if 'kmeans_k_value' not in st.session_state:
-    st.session_state.kmeans_k_value = 5
-if 'dbscan_eps_value' not in st.session_state:
-    st.session_state.dbscan_eps_value = 0.8
-if 'dbscan_min_samples_value' not in st.session_state:
-    st.session_state.dbscan_min_samples_value = 5
 
 if uploaded_file:
+    # Load and preprocess data
     df = pd.read_csv(uploaded_file)
     st.subheader("Dataset Preview")
     st.dataframe(df.head())
@@ -62,9 +57,7 @@ if uploaded_file:
     if page == "K-Means Clustering":
         st.header("K-Means Clustering")
         
-        # Slider that remembers value
-        k_value = st.slider("Number of Clusters (k)", 2, 10, st.session_state.kmeans_k_value, key="kmeans_slider")
-        st.session_state.kmeans_k_value = k_value
+        k_value = st.slider("Number of Clusters (k)", 2, 10, 5)
         
         if st.button("Run K-Means", type="primary"):
             with st.spinner("Running K-Means..."):
@@ -160,11 +153,8 @@ if uploaded_file:
     elif page == "DBSCAN Clustering":
         st.header("DBSCAN Clustering")
         
-        # Sliders that remember values
-        eps_value = st.slider("Epsilon (eps)", 0.1, 2.0, st.session_state.dbscan_eps_value, 0.05, key="dbscan_eps_slider")
-        min_samples_value = st.slider("Min Samples", 2, 20, st.session_state.dbscan_min_samples_value, key="dbscan_min_slider")
-        st.session_state.dbscan_eps_value = eps_value
-        st.session_state.dbscan_min_samples_value = min_samples_value
+        eps_value = st.slider("Epsilon (eps)", 0.1, 2.0, 0.8, 0.05)
+        min_samples_value = st.slider("Min Samples", 2, 20, 5)
         
         if st.button("Run DBSCAN", type="primary"):
             with st.spinner("Running DBSCAN..."):
@@ -268,20 +258,23 @@ if uploaded_file:
         else:
             st.info("Click the 'Run DBSCAN' button to see results")
     
-    # ========== METHOD COMPARISON ==========
+# ========== METHOD COMPARISON (FIXED) ==========
     elif page == "Method Comparison":
         st.header("Algorithm Comparison")
         
+        # Check if both algorithms have been run
         kmeans_done = st.session_state.kmeans_result is not None
         dbscan_done = st.session_state.dbscan_result is not None
         
         if kmeans_done and dbscan_done:
+            # Get values safely
             kmeans_sil = st.session_state.kmeans_result.get('silhouette', 0)
             dbscan_sil = st.session_state.dbscan_result.get('silhouette', -1)
             kmeans_k = st.session_state.kmeans_result.get('k', 0)
             dbscan_clusters = st.session_state.dbscan_result.get('clusters', 0)
             dbscan_noise = st.session_state.dbscan_result.get('noise', 0)
             
+            # Create comparison dataframe
             comp_data = pd.DataFrame({
                 "Algorithm": ["K-Means", "DBSCAN"],
                 "Silhouette Score": [f"{kmeans_sil:.4f}", f"{dbscan_sil:.4f}" if dbscan_sil > 0 else "N/A"],
@@ -290,30 +283,36 @@ if uploaded_file:
             })
             st.dataframe(comp_data, use_container_width=True)
             
+            # Recommendation
             st.subheader("Recommendation")
             if dbscan_sil > 0:
                 if kmeans_sil > dbscan_sil:
-                    st.success("K-Means performs better with a higher silhouette score.")
+                    st.success("✅ **K-Means** performs better with a higher silhouette score.")
+                    st.write("K-Means creates clear, separated segments. Good for standard customer grouping.")
                 elif dbscan_sil > kmeans_sil:
-                    st.success("DBSCAN performs better with a higher silhouette score.")
+                    st.success("✅ **DBSCAN** performs better with a higher silhouette score.")
+                    st.write("DBSCAN finds natural clusters and identifies outliers. Good for detecting unusual patterns.")
                 else:
-                    st.info("Both algorithms perform similarly.")
+                    st.info("Both algorithms perform similarly. Choose based on your business needs.")
             else:
                 st.info("K-Means is recommended as DBSCAN found limited clusters.")
             
+            # Visual comparison
             st.subheader("Visual Comparison")
             pca = PCA(n_components=2)
             X_pca = pca.fit_transform(X_scaled)
             
             fig, axes = plt.subplots(1, 2, figsize=(14, 5))
             
+            # K-Means plot
             kmeans_labels = st.session_state.kmeans_result.get('labels')
             if kmeans_labels is not None:
                 axes[0].scatter(X_pca[:, 0], X_pca[:, 1], c=kmeans_labels, cmap='viridis', s=50, alpha=0.6)
-                axes[0].set_title(f"K-Means ({kmeans_k} Segments)", fontsize=12)
+                axes[0].set_title(f"K-Means Clustering ({kmeans_k} Segments)", fontsize=12)
                 axes[0].set_xlabel("PC1")
                 axes[0].set_ylabel("PC2")
             
+            # DBSCAN plot
             dbscan_labels = st.session_state.dbscan_result.get('labels')
             if dbscan_labels is not None:
                 unique_labels = set(dbscan_labels)
@@ -323,7 +322,7 @@ if uploaded_file:
                         axes[1].scatter(X_pca[mask, 0], X_pca[mask, 1], c='black', s=50, label='Noise', alpha=0.5)
                     else:
                         axes[1].scatter(X_pca[mask, 0], X_pca[mask, 1], s=50, alpha=0.6, label=f'Cluster {k}')
-                axes[1].set_title(f"DBSCAN ({dbscan_clusters} Segments, {dbscan_noise} Noise)", fontsize=12)
+                axes[1].set_title(f"DBSCAN Clustering ({dbscan_clusters} Segments, {dbscan_noise} Noise)", fontsize=12)
                 axes[1].set_xlabel("PC1")
                 axes[1].set_ylabel("PC2")
                 axes[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -331,11 +330,11 @@ if uploaded_file:
             plt.tight_layout()
             st.pyplot(fig)
         else:
-            st.warning("Please run both K-Means and DBSCAN first")
+            st.warning("Please run both K-Means and DBSCAN first to see comparison")
             if not kmeans_done:
-                st.info("Go to K-Means Clustering page and click Run K-Means")
+                st.info("👉 Go to **K-Means Clustering** page and click 'Run K-Means'")
             if not dbscan_done:
-                st.info("Go to DBSCAN Clustering page and click Run DBSCAN")
+                st.info("👉 Go to **DBSCAN Clustering** page and click 'Run DBSCAN'")
     
     # ========== CUSTOMER PROFILING ==========
     elif page == "Customer Profiling":
@@ -475,12 +474,13 @@ if uploaded_file:
             youngest = min(segment_details, key=lambda x: x['age'])
             oldest = max(segment_details, key=lambda x: x['age'])
             
+            # Fixed: All strings on single lines, no newlines inside quotes
             c1, c2, c3, c4, c5 = st.columns(5)
-            c1.info("Largest: " + largest['name'] + " (" + str(largest['size']) + " customers)")
-            c2.success("Biggest Spenders: " + highest_spending['name'] + " (Score: " + str(round(highest_spending['spending'], 0)) + ")")
-            c3.warning("Highest Income: " + highest_income['name'] + " ($" + str(round(highest_income['income'], 0)) + "K)")
-            c4.info("Youngest: " + youngest['name'] + " (" + str(round(youngest['age'], 0)) + " years)")
-            c5.success("Oldest: " + oldest['name'] + " (" + str(round(oldest['age'], 0)) + " years)")
+            c1.info("**Largest Segment** - " + largest['name'] + " (" + str(largest['size']) + " customers)")
+            c2.success("**Biggest Spenders** - " + highest_spending['name'] + " (Score: " + str(round(highest_spending['spending'], 0)) + "/100)")
+            c3.warning("**Highest Income** - " + highest_income['name'] + " ($" + str(round(highest_income['income'], 0)) + "K)")
+            c4.info("**Youngest Segment** - " + youngest['name'] + " (" + str(round(youngest['age'], 0)) + " years)")
+            c5.success("**Oldest Segment** - " + oldest['name'] + " (" + str(round(oldest['age'], 0)) + " years)")
             
             st.subheader('Export Data')
             csv = df_profiles.to_csv(index=False).encode('utf-8')
