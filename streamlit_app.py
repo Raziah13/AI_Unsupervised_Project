@@ -258,23 +258,83 @@ if uploaded_file:
         else:
             st.info("Click the 'Run DBSCAN' button to see results")
     
-    # ========== METHOD COMPARISON ==========
+# ========== METHOD COMPARISON (FIXED) ==========
     elif page == "Method Comparison":
         st.header("Algorithm Comparison")
         
-        if st.session_state.kmeans_result is not None and st.session_state.dbscan_result is not None:
-            kmeans_sil = f"{st.session_state.kmeans_result['silhouette']:.4f}"
-            dbscan_sil = f"{st.session_state.dbscan_result['silhouette']:.4f}" if st.session_state.dbscan_result['silhouette'] > 0 else "N/A"
+        # Check if both algorithms have been run
+        kmeans_done = st.session_state.kmeans_result is not None
+        dbscan_done = st.session_state.dbscan_result is not None
+        
+        if kmeans_done and dbscan_done:
+            # Get values safely
+            kmeans_sil = st.session_state.kmeans_result.get('silhouette', 0)
+            dbscan_sil = st.session_state.dbscan_result.get('silhouette', -1)
+            kmeans_k = st.session_state.kmeans_result.get('k', 0)
+            dbscan_clusters = st.session_state.dbscan_result.get('clusters', 0)
+            dbscan_noise = st.session_state.dbscan_result.get('noise', 0)
             
+            # Create comparison dataframe
             comp_data = pd.DataFrame({
                 "Algorithm": ["K-Means", "DBSCAN"],
-                "Silhouette Score": [kmeans_sil, dbscan_sil],
-                "Number of Segments": [st.session_state.kmeans_result['k'], st.session_state.dbscan_result['clusters']],
-                "Noise Points": ["None (0)", f"{st.session_state.dbscan_result['noise']} customers"]
+                "Silhouette Score": [f"{kmeans_sil:.4f}", f"{dbscan_sil:.4f}" if dbscan_sil > 0 else "N/A"],
+                "Number of Segments": [kmeans_k, dbscan_clusters],
+                "Noise Points": ["None (0)", f"{dbscan_noise} customers"]
             })
             st.dataframe(comp_data, use_container_width=True)
+            
+            # Recommendation
+            st.subheader("Recommendation")
+            if dbscan_sil > 0:
+                if kmeans_sil > dbscan_sil:
+                    st.success("✅ **K-Means** performs better with a higher silhouette score.")
+                    st.write("K-Means creates clear, separated segments. Good for standard customer grouping.")
+                elif dbscan_sil > kmeans_sil:
+                    st.success("✅ **DBSCAN** performs better with a higher silhouette score.")
+                    st.write("DBSCAN finds natural clusters and identifies outliers. Good for detecting unusual patterns.")
+                else:
+                    st.info("Both algorithms perform similarly. Choose based on your business needs.")
+            else:
+                st.info("K-Means is recommended as DBSCAN found limited clusters.")
+            
+            # Visual comparison
+            st.subheader("Visual Comparison")
+            pca = PCA(n_components=2)
+            X_pca = pca.fit_transform(X_scaled)
+            
+            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+            
+            # K-Means plot
+            kmeans_labels = st.session_state.kmeans_result.get('labels')
+            if kmeans_labels is not None:
+                axes[0].scatter(X_pca[:, 0], X_pca[:, 1], c=kmeans_labels, cmap='viridis', s=50, alpha=0.6)
+                axes[0].set_title(f"K-Means Clustering ({kmeans_k} Segments)", fontsize=12)
+                axes[0].set_xlabel("PC1")
+                axes[0].set_ylabel("PC2")
+            
+            # DBSCAN plot
+            dbscan_labels = st.session_state.dbscan_result.get('labels')
+            if dbscan_labels is not None:
+                unique_labels = set(dbscan_labels)
+                for k in unique_labels:
+                    mask = dbscan_labels == k
+                    if k == -1:
+                        axes[1].scatter(X_pca[mask, 0], X_pca[mask, 1], c='black', s=50, label='Noise', alpha=0.5)
+                    else:
+                        axes[1].scatter(X_pca[mask, 0], X_pca[mask, 1], s=50, alpha=0.6, label=f'Cluster {k}')
+                axes[1].set_title(f"DBSCAN Clustering ({dbscan_clusters} Segments, {dbscan_noise} Noise)", fontsize=12)
+                axes[1].set_xlabel("PC1")
+                axes[1].set_ylabel("PC2")
+                axes[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            
+            plt.tight_layout()
+            st.pyplot(fig)
         else:
-            st.warning("Please run both K-Means and DBSCAN first")
+            st.warning("Please run both K-Means and DBSCAN first to see comparison")
+            if not kmeans_done:
+                st.info("👉 Go to **K-Means Clustering** page and click 'Run K-Means'")
+            if not dbscan_done:
+                st.info("👉 Go to **DBSCAN Clustering** page and click 'Run DBSCAN'")
     
     # ========== CUSTOMER PROFILING ==========
     elif page == "Customer Profiling":
