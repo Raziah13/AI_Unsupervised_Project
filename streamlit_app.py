@@ -1,4 +1,4 @@
-# COMPLETELY WORKING VERSION - Results show only after clicking Run
+# COMPLETELY WORKING VERSION - Fixed f-string errors
 import os
 
 if os.path.exists('streamlit_app.py'):
@@ -29,10 +29,6 @@ if 'kmeans_result' not in st.session_state:
     st.session_state.kmeans_result = None
 if 'dbscan_result' not in st.session_state:
     st.session_state.dbscan_result = None
-if 'kmeans_df' not in st.session_state:
-    st.session_state.kmeans_df = None
-if 'dbscan_df' not in st.session_state:
-    st.session_state.dbscan_df = None
 
 if uploaded_file:
     # Load and preprocess data
@@ -420,12 +416,13 @@ if uploaded_file:
             youngest = min(segment_details, key=lambda x: x['age'])
             oldest = max(segment_details, key=lambda x: x['age'])
             
+            # Fixed: No multi-line f-strings
             c1, c2, c3, c4, c5 = st.columns(5)
-            c1.info(f"**Largest**\n\n{largest['name']}\n{largest['size']} customers")
-            c2.success(f"**Biggest Spenders**\n\n{highest_spending['name']}\nScore: {highest_spending['spending']:.0f}/100")
-            c3.warning(f"**Highest Income**\n\n{highest_income['name']}\n${highest_income['income']:.0f}K")
-            c4.info(f"**Youngest**\n\n{youngest['name']}\n{youngest['age']:.0f} years")
-            c5.success(f"**Oldest**\n\n{oldest['name']}\n{oldest['age']:.0f} years")
+            c1.info("**Largest**\n\n" + largest['name'] + "\n" + str(largest['size']) + " customers")
+            c2.success("**Biggest Spenders**\n\n" + highest_spending['name'] + "\nScore: " + str(round(highest_spending['spending'], 0)) + "/100")
+            c3.warning("**Highest Income**\n\n" + highest_income['name'] + "\n$" + str(round(highest_income['income'], 0)) + "K")
+            c4.info("**Youngest**\n\n" + youngest['name'] + "\n" + str(round(youngest['age'], 0)) + " years")
+            c5.success("**Oldest**\n\n" + oldest['name'] + "\n" + str(round(oldest['age'], 0)) + " years")
             
             st.subheader('Export Data')
             csv = df_profiles.to_csv(index=False).encode('utf-8')
