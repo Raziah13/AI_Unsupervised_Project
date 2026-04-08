@@ -1,4 +1,4 @@
-# Create SIMPLE working streamlit_app.py
+# Create SIMPLE working streamlit_app.py - NO f-string errors
 import os
 
 # Delete old file
@@ -66,7 +66,6 @@ if uploaded_file:
     if page == "K-Means Clustering":
         st.header("K-Means Clustering")
         
-        # Use fixed k=5 (optimal from your analysis)
         k_value = st.slider("Number of Clusters (k)", 2, 10, 5)
         
         if st.button("Run K-Means", type="primary"):
@@ -75,18 +74,15 @@ if uploaded_file:
                 labels = kmeans.fit_predict(X_scaled)
                 df_clean['Cluster'] = labels
                 
-                # Calculate silhouette score
                 sil_score = silhouette_score(X_scaled, labels)
                 
-                st.success(f"Done! Silhouette Score: {sil_score:.4f}")
+                st.success("Done! Silhouette Score: " + str(round(sil_score, 4)))
                 
-                # Show metrics
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Number of Clusters", k_value)
-                col2.metric("Silhouette Score", f"{sil_score:.4f}")
+                col2.metric("Silhouette Score", str(round(sil_score, 4)))
                 col3.metric("Total Customers", len(df_clean))
                 
-                # PCA Visualization
                 pca = PCA(n_components=2)
                 X_pca = pca.fit_transform(X_scaled)
                 
@@ -95,27 +91,25 @@ if uploaded_file:
                 plt.colorbar(scatter)
                 ax.set_xlabel("First Principal Component")
                 ax.set_ylabel("Second Principal Component")
-                ax.set_title(f"K-Means Clustering Results ({k_value} Segments)")
+                ax.set_title("K-Means Clustering Results (" + str(k_value) + " Segments)")
                 st.pyplot(fig)
                 
-                # Show segment profiles
                 st.subheader("Segment Profiles")
                 
                 profile_data = []
                 for cluster in range(k_value):
                     cluster_data = df_clean[df_clean['Cluster'] == cluster]
                     profile_data.append({
-                        'Segment': f"Segment {cluster + 1}",
+                        'Segment': "Segment " + str(cluster + 1),
                         'Size': len(cluster_data),
-                        'Percentage': f"{len(cluster_data)/len(df_clean)*100:.1f}%",
-                        'Avg Age': f"{cluster_data['Age'].mean():.0f}",
-                        'Avg Income': f"${cluster_data['Annual_Income'].mean():.0f}K",
-                        'Avg Spending': f"{cluster_data['Spending_Score'].mean():.0f}"
+                        'Percentage': str(round(len(cluster_data)/len(df_clean)*100, 1)) + "%",
+                        'Avg Age': str(round(cluster_data['Age'].mean(), 0)),
+                        'Avg Income': "$" + str(round(cluster_data['Annual_Income'].mean(), 0)) + "K",
+                        'Avg Spending': str(round(cluster_data['Spending_Score'].mean(), 0))
                     })
                 
                 st.dataframe(pd.DataFrame(profile_data), use_container_width=True)
                 
-                # Store for profiling page
                 st.session_state.kmeans_df = df_clean.copy()
                 st.session_state.kmeans_ran = True
                 st.session_state.kmeans_k = k_value
@@ -147,18 +141,16 @@ if uploaded_file:
                 if n_clusters >= 2:
                     mask = labels != -1
                     sil_score = silhouette_score(X_scaled[mask], labels[mask])
-                    st.success(f"Done! Found {n_clusters} clusters")
-                    st.info(f"Silhouette Score (excluding noise): {sil_score:.4f}")
+                    st.success("Done! Found " + str(n_clusters) + " clusters")
+                    st.info("Silhouette Score (excluding noise): " + str(round(sil_score, 4)))
                 else:
-                    st.warning(f"Found only {n_clusters} clusters. Try adjusting parameters.")
+                    st.warning("Found only " + str(n_clusters) + " clusters. Try adjusting parameters.")
                 
-                # Show metrics
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Clusters Found", n_clusters)
                 col2.metric("Noise Points", n_noise)
-                col3.metric("Noise %", f"{(n_noise/len(labels))*100:.1f}%")
+                col3.metric("Noise %", str(round((n_noise/len(labels))*100, 1)) + "%")
                 
-                # PCA Visualization
                 pca = PCA(n_components=2)
                 X_pca = pca.fit_transform(X_scaled)
                 
@@ -168,13 +160,13 @@ if uploaded_file:
                 for k in unique_labels:
                     mask = labels == k
                     if k == -1:
-                        ax.scatter(X_pca[mask, 0], X_pca[mask, 1], c='black', s=50, label=f'Noise ({n_noise})', alpha=0.5)
+                        ax.scatter(X_pca[mask, 0], X_pca[mask, 1], c='black', s=50, label='Noise (' + str(n_noise) + ')', alpha=0.5)
                     else:
-                        ax.scatter(X_pca[mask, 0], X_pca[mask, 1], s=50, alpha=0.6, label=f'Cluster {k}')
+                        ax.scatter(X_pca[mask, 0], X_pca[mask, 1], s=50, alpha=0.6, label='Cluster ' + str(k))
                 
                 ax.set_xlabel("First Principal Component")
                 ax.set_ylabel("Second Principal Component")
-                ax.set_title(f"DBSCAN Clustering Results (eps={eps_value})")
+                ax.set_title("DBSCAN Clustering Results")
                 ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
                 st.pyplot(fig)
                 
@@ -184,7 +176,7 @@ if uploaded_file:
             st.info("Click 'Run DBSCAN' button to start clustering")
     
     # ============================================
-    # CUSTOMER PROFILES (using K-Means results)
+    # CUSTOMER PROFILES
     # ============================================
     elif page == "Customer Profiles":
         st.header("Customer Segment Profiles")
@@ -195,13 +187,11 @@ if uploaded_file:
             
             st.subheader("Segment Characteristics")
             
-            # Create detailed profiles
             for cluster in range(k):
                 cluster_data = df_profiles[df_profiles['Cluster'] == cluster]
                 size = len(cluster_data)
                 percentage = size / len(df_profiles) * 100
                 
-                # Determine segment name based on characteristics
                 income = cluster_data['Annual_Income'].mean()
                 spending = cluster_data['Spending_Score'].mean()
                 age = cluster_data['Age'].mean()
@@ -231,17 +221,17 @@ if uploaded_file:
                     name = "Regular Customers"
                     icon = "⭐"
                 
-                with st.expander(f"{icon} {name} - {size} customers ({percentage:.1f}%)"):
+                with st.expander(icon + " " + name + " - " + str(size) + " customers (" + str(round(percentage, 1)) + "%)"):
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write("**Characteristics:**")
-                        st.write(f"- Average Age: {cluster_data['Age'].mean():.0f} years")
-                        st.write(f"- Average Income: ${cluster_data['Annual_Income'].mean():.0f}K")
-                        st.write(f"- Average Spending: {cluster_data['Spending_Score'].mean():.0f}/100")
+                        st.write("- Average Age: " + str(round(cluster_data['Age'].mean(), 0)) + " years")
+                        st.write("- Average Income: $" + str(round(cluster_data['Annual_Income'].mean(), 0)) + "K")
+                        st.write("- Average Spending: " + str(round(cluster_data['Spending_Score'].mean(), 0)) + "/100")
                         
                         if 'Gender' in cluster_data.columns:
                             female_pct = (cluster_data['Gender'] == 'Female').sum() / size * 100
-                            st.write(f"- Gender: {female_pct:.0f}% Female, {100-female_pct:.0f}% Male")
+                            st.write("- Gender: " + str(round(female_pct, 0)) + "% Female, " + str(round(100-female_pct, 0)) + "% Male")
                     
                     with col2:
                         st.write("**Marketing Strategy:**")
@@ -270,22 +260,18 @@ if uploaded_file:
                             st.write("- Balanced marketing approach")
                             st.write("- Mix of digital and traditional channels")
             
-            # Summary insights
             st.subheader("Key Insights")
             
-            # Find largest segment
             largest = max(range(k), key=lambda x: len(df_profiles[df_profiles['Cluster'] == x]))
             largest_data = df_profiles[df_profiles['Cluster'] == largest]
             
-            # Find highest spending segment
             highest_spending = max(range(k), key=lambda x: df_profiles[df_profiles['Cluster'] == x]['Spending_Score'].mean())
             highest_spending_data = df_profiles[df_profiles['Cluster'] == highest_spending]
             
             col1, col2 = st.columns(2)
-            col1.info(f"**Largest Segment**\n\nSegment {largest+1}\n{len(largest_data)} customers")
-            col2.success(f"**Highest Spending Segment**\n\nSegment {highest_spending+1}\nAvg Spending: {highest_spending_data['Spending_Score'].mean():.0f}/100")
+            col1.info("**Largest Segment**\n\nSegment " + str(largest+1) + "\n" + str(len(largest_data)) + " customers")
+            col2.success("**Highest Spending Segment**\n\nSegment " + str(highest_spending+1) + "\nAvg Spending: " + str(round(highest_spending_data['Spending_Score'].mean(), 0)) + "/100")
             
-            # Download button
             st.subheader("Export Data")
             csv = df_profiles.to_csv(index=False).encode('utf-8')
             st.download_button("Download Segmentation Results", csv, "segmentation_results.csv")
