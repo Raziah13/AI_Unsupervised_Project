@@ -1,4 +1,4 @@
-# FINAL WORKING VERSION - Keep your Customer Profiling, add DBSCAN summary
+# FINAL WORKING VERSION - Results ONLY show after clicking Run button
 import os
 
 # Delete old file
@@ -49,7 +49,7 @@ if uploaded_file:
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Session state
+    # Session state - all start as False/None
     if 'kmeans_ran' not in st.session_state:
         st.session_state.kmeans_ran = False
     if 'dbscan_ran' not in st.session_state:
@@ -86,7 +86,9 @@ if uploaded_file:
         col1, col2 = st.columns([1, 2])
         with col1:
             k_value = st.slider("Number of Clusters (k)", 2, 10, 5)
-            if st.button("Run K-Means", type="primary"):
+            run_button = st.button("Run K-Means", type="primary")
+            
+            if run_button:
                 with st.spinner("Running K-Means..."):
                     kmeans = KMeans(n_clusters=k_value, random_state=42, n_init=10)
                     labels = kmeans.fit_predict(X_scaled)
@@ -110,6 +112,7 @@ if uploaded_file:
                 m2.metric("Calinski-Harabasz", f"{st.session_state.kmeans_cal:.0f}")
                 m3.metric("Davies-Bouldin", f"{st.session_state.kmeans_dav:.4f}")
         
+        # ONLY show results if run button was clicked
         if st.session_state.kmeans_ran:
             st.subheader("Clustering Results")
             pca = PCA(n_components=2)
@@ -173,7 +176,7 @@ if uploaded_file:
                 })
             st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
         else:
-            st.info("Click the Run K-Means button above to see results")
+            st.info("👈 Click the 'Run K-Means' button to see results")
     
     # ========== DBSCAN CLUSTERING ==========
     elif page == "DBSCAN Clustering":
@@ -183,7 +186,9 @@ if uploaded_file:
         with col1:
             eps_value = st.slider("Epsilon (eps)", 0.1, 2.0, 0.8, 0.05)
             min_samples_value = st.slider("Min Samples", 2, 20, 5)
-            if st.button("Run DBSCAN", type="primary"):
+            run_button = st.button("Run DBSCAN", type="primary")
+            
+            if run_button:
                 with st.spinner("Running DBSCAN..."):
                     dbscan = DBSCAN(eps=eps_value, min_samples=min_samples_value)
                     labels = dbscan.fit_predict(X_scaled)
@@ -213,6 +218,7 @@ if uploaded_file:
                 else:
                     m3.metric("Silhouette Score", "N/A")
         
+        # ONLY show results if run button was clicked
         if st.session_state.dbscan_ran:
             st.subheader("Clustering Results")
             pca = PCA(n_components=2)
@@ -290,7 +296,7 @@ if uploaded_file:
             else:
                 st.warning("Not enough clusters found for summarization. Try adjusting eps and min_samples parameters.")
         else:
-            st.info("Click the Run DBSCAN button above to see results")
+            st.info("👈 Click the 'Run DBSCAN' button to see results")
     
     # ========== METHOD COMPARISON ==========
     elif page == "Method Comparison":
@@ -332,8 +338,12 @@ if uploaded_file:
             st.pyplot(fig)
         else:
             st.warning("Please run both K-Means and DBSCAN first")
+            if not st.session_state.kmeans_ran:
+                st.info("Go to K-Means Clustering page and click Run K-Means")
+            if not st.session_state.dbscan_ran:
+                st.info("Go to DBSCAN Clustering page and click Run DBSCAN")
     
-    # ========== CUSTOMER PROFILING (YOUR ORIGINAL CODE) ==========
+    # ========== CUSTOMER PROFILING ==========
     elif page == "Customer Profiling":
         st.header("Customer Segment Profiles")
         
