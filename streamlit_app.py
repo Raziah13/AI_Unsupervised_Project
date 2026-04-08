@@ -1,4 +1,4 @@
-# Create SIMPLE working streamlit_app.py - NO f-string errors
+# Create SIMPLE working streamlit_app.py - NO newline issues
 import os
 
 # Delete old file
@@ -221,44 +221,45 @@ if uploaded_file:
                     name = "Regular Customers"
                     icon = "⭐"
                 
-                with st.expander(icon + " " + name + " - " + str(size) + " customers (" + str(round(percentage, 1)) + "%)"):
+                expander_title = icon + " " + name + " - " + str(size) + " customers (" + str(round(percentage, 1)) + "%)"
+                with st.expander(expander_title):
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.write("**Characteristics:**")
-                        st.write("- Average Age: " + str(round(cluster_data['Age'].mean(), 0)) + " years")
-                        st.write("- Average Income: $" + str(round(cluster_data['Annual_Income'].mean(), 0)) + "K")
-                        st.write("- Average Spending: " + str(round(cluster_data['Spending_Score'].mean(), 0)) + "/100")
+                        st.write("**Customer Characteristics:**")
+                        st.write("• Average Age: " + str(round(cluster_data['Age'].mean(), 0)) + " years")
+                        st.write("• Average Income: $" + str(round(cluster_data['Annual_Income'].mean(), 0)) + "K")
+                        st.write("• Average Spending: " + str(round(cluster_data['Spending_Score'].mean(), 0)) + "/100")
                         
                         if 'Gender' in cluster_data.columns:
                             female_pct = (cluster_data['Gender'] == 'Female').sum() / size * 100
-                            st.write("- Gender: " + str(round(female_pct, 0)) + "% Female, " + str(round(100-female_pct, 0)) + "% Male")
+                            st.write("• Gender: " + str(round(female_pct, 0)) + "% Female, " + str(round(100-female_pct, 0)) + "% Male")
                     
                     with col2:
                         st.write("**Marketing Strategy:**")
                         if "VIP" in name:
-                            st.write("- Offer exclusive products and early access")
-                            st.write("- VIP loyalty program with premium benefits")
+                            st.write("• Offer exclusive products and early access")
+                            st.write("• VIP loyalty program with premium benefits")
                         elif "Smart Value" in name:
-                            st.write("- Focus on discounts, cashback, and bundle deals")
-                            st.write("- Price-match guarantees")
+                            st.write("• Focus on discounts, cashback, and bundle deals")
+                            st.write("• Price-match guarantees")
                         elif "Aspiring" in name:
-                            st.write("- Social media campaigns and influencer marketing")
-                            st.write("- Flash sales and limited editions")
+                            st.write("• Social media campaigns and influencer marketing")
+                            st.write("• Flash sales and limited editions")
                         elif "Practical" in name:
-                            st.write("- Essential items at competitive prices")
-                            st.write("- Loyalty points for everyday purchases")
+                            st.write("• Essential items at competitive prices")
+                            st.write("• Loyalty points for everyday purchases")
                         elif "Young" in name:
-                            st.write("- Instagram, TikTok, and mobile app marketing")
-                            st.write("- New arrivals and seasonal items")
+                            st.write("• Instagram, TikTok, and mobile app marketing")
+                            st.write("• New arrivals and seasonal items")
                         elif "Established" in name:
-                            st.write("- Quality focus and service excellence")
-                            st.write("- Email newsletters and phone support")
+                            st.write("• Quality focus and service excellence")
+                            st.write("• Email newsletters and phone support")
                         elif "Comfort" in name:
-                            st.write("- Trust and familiarity messaging")
-                            st.write("- Traditional media and direct mail")
+                            st.write("• Trust and familiarity messaging")
+                            st.write("• Traditional media and direct mail")
                         else:
-                            st.write("- Balanced marketing approach")
-                            st.write("- Mix of digital and traditional channels")
+                            st.write("• Balanced marketing approach")
+                            st.write("• Mix of digital and traditional channels")
             
             st.subheader("Key Insights")
             
@@ -269,8 +270,13 @@ if uploaded_file:
             highest_spending_data = df_profiles[df_profiles['Cluster'] == highest_spending]
             
             col1, col2 = st.columns(2)
-            col1.info("**Largest Segment**\n\nSegment " + str(largest+1) + "\n" + str(len(largest_data)) + " customers")
-            col2.success("**Highest Spending Segment**\n\nSegment " + str(highest_spending+1) + "\nAvg Spending: " + str(round(highest_spending_data['Spending_Score'].mean(), 0)) + "/100")
+            col1.info("**Largest Segment**")
+            col1.write("Segment " + str(largest+1))
+            col1.write(str(len(largest_data)) + " customers")
+            
+            col2.success("**Highest Spending Segment**")
+            col2.write("Segment " + str(highest_spending+1))
+            col2.write("Avg Spending: " + str(round(highest_spending_data['Spending_Score'].mean(), 0)) + "/100")
             
             st.subheader("Export Data")
             csv = df_profiles.to_csv(index=False).encode('utf-8')
