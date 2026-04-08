@@ -1,303 +1,480 @@
-# Create SIMPLE working streamlit_app.py - NO newline issues
+# Create streamlit_app.py - Fixed k=5 and added segment summarization
 import os
 
 # Delete old file
 if os.path.exists('streamlit_app.py'):
     os.remove('streamlit_app.py')
 
+# Create file line by line
 with open('streamlit_app.py', 'w', encoding='utf-8') as f:
-    f.write("""
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.cluster import KMeans, DBSCAN
-from sklearn.metrics import silhouette_score
-from sklearn.decomposition import PCA
-
-st.set_page_config(page_title="Customer Segmentation", layout="wide")
-st.title("Customer Segmentation Dashboard")
-
-st.sidebar.header("Upload & Settings")
-uploaded_file = st.sidebar.file_uploader("Upload CSV Dataset", type=["csv"])
-
-# Sidebar navigation
-st.sidebar.subheader("Navigation")
-page = st.sidebar.radio(
-    "Choose Analysis Type",
-    ["K-Means Clustering", "DBSCAN Clustering", "Customer Profiles"]
-)
-
-if uploaded_file:
-    # Load and preprocess data
-    df = pd.read_csv(uploaded_file)
-    st.subheader("Dataset Preview")
-    st.dataframe(df.head())
-    
-    # Preprocessing
-    df_clean = df.copy()
-    
-    # Handle column names
-    if 'Annual Income (k$)' in df_clean.columns:
-        df_clean.rename(columns={'Annual Income (k$)': 'Annual_Income'}, inplace=True)
-    if 'Spending Score (1-100)' in df_clean.columns:
-        df_clean.rename(columns={'Spending Score (1-100)': 'Spending_Score'}, inplace=True)
-    
-    # Encode Gender
-    if 'Gender' in df_clean.columns:
-        le = LabelEncoder()
-        df_clean['Gender_Encoded'] = le.fit_transform(df_clean['Gender'])
-    else:
-        df_clean['Gender_Encoded'] = 0
-    
-    # Features
-    features = ['Age', 'Annual_Income', 'Spending_Score', 'Gender_Encoded']
-    X = df_clean[features].copy()
-    
-    # Scale
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    
-    # ============================================
-    # K-MEANS CLUSTERING
-    # ============================================
-    if page == "K-Means Clustering":
-        st.header("K-Means Clustering")
-        
-        k_value = st.slider("Number of Clusters (k)", 2, 10, 5)
-        
-        if st.button("Run K-Means", type="primary"):
-            with st.spinner("Running K-Means..."):
-                kmeans = KMeans(n_clusters=k_value, random_state=42, n_init=10)
-                labels = kmeans.fit_predict(X_scaled)
-                df_clean['Cluster'] = labels
-                
-                sil_score = silhouette_score(X_scaled, labels)
-                
-                st.success("Done! Silhouette Score: " + str(round(sil_score, 4)))
-                
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Number of Clusters", k_value)
-                col2.metric("Silhouette Score", str(round(sil_score, 4)))
-                col3.metric("Total Customers", len(df_clean))
-                
-                pca = PCA(n_components=2)
-                X_pca = pca.fit_transform(X_scaled)
-                
-                fig, ax = plt.subplots(figsize=(10, 6))
-                scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='viridis', s=100, alpha=0.6)
-                plt.colorbar(scatter)
-                ax.set_xlabel("First Principal Component")
-                ax.set_ylabel("Second Principal Component")
-                ax.set_title("K-Means Clustering Results (" + str(k_value) + " Segments)")
-                st.pyplot(fig)
-                
-                st.subheader("Segment Profiles")
-                
-                profile_data = []
-                for cluster in range(k_value):
-                    cluster_data = df_clean[df_clean['Cluster'] == cluster]
-                    profile_data.append({
-                        'Segment': "Segment " + str(cluster + 1),
-                        'Size': len(cluster_data),
-                        'Percentage': str(round(len(cluster_data)/len(df_clean)*100, 1)) + "%",
-                        'Avg Age': str(round(cluster_data['Age'].mean(), 0)),
-                        'Avg Income': "$" + str(round(cluster_data['Annual_Income'].mean(), 0)) + "K",
-                        'Avg Spending': str(round(cluster_data['Spending_Score'].mean(), 0))
-                    })
-                
-                st.dataframe(pd.DataFrame(profile_data), use_container_width=True)
-                
-                st.session_state.kmeans_df = df_clean.copy()
-                st.session_state.kmeans_ran = True
-                st.session_state.kmeans_k = k_value
-        
-        else:
-            st.info("Click 'Run K-Means' button to start clustering")
-    
-    # ============================================
-    # DBSCAN CLUSTERING
-    # ============================================
-    elif page == "DBSCAN Clustering":
-        st.header("DBSCAN Clustering")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            eps_value = st.slider("Epsilon (eps)", 0.1, 2.0, 0.8, 0.05)
-        with col2:
-            min_samples_value = st.slider("Min Samples", 2, 20, 5)
-        
-        if st.button("Run DBSCAN", type="primary"):
-            with st.spinner("Running DBSCAN..."):
-                dbscan = DBSCAN(eps=eps_value, min_samples=min_samples_value)
-                labels = dbscan.fit_predict(X_scaled)
-                df_clean['DBSCAN_Cluster'] = labels
-                
-                n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-                n_noise = list(labels).count(-1)
-                
-                if n_clusters >= 2:
-                    mask = labels != -1
-                    sil_score = silhouette_score(X_scaled[mask], labels[mask])
-                    st.success("Done! Found " + str(n_clusters) + " clusters")
-                    st.info("Silhouette Score (excluding noise): " + str(round(sil_score, 4)))
-                else:
-                    st.warning("Found only " + str(n_clusters) + " clusters. Try adjusting parameters.")
-                
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Clusters Found", n_clusters)
-                col2.metric("Noise Points", n_noise)
-                col3.metric("Noise %", str(round((n_noise/len(labels))*100, 1)) + "%")
-                
-                pca = PCA(n_components=2)
-                X_pca = pca.fit_transform(X_scaled)
-                
-                fig, ax = plt.subplots(figsize=(10, 6))
-                unique_labels = set(labels)
-                
-                for k in unique_labels:
-                    mask = labels == k
-                    if k == -1:
-                        ax.scatter(X_pca[mask, 0], X_pca[mask, 1], c='black', s=50, label='Noise (' + str(n_noise) + ')', alpha=0.5)
-                    else:
-                        ax.scatter(X_pca[mask, 0], X_pca[mask, 1], s=50, alpha=0.6, label='Cluster ' + str(k))
-                
-                ax.set_xlabel("First Principal Component")
-                ax.set_ylabel("Second Principal Component")
-                ax.set_title("DBSCAN Clustering Results")
-                ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-                st.pyplot(fig)
-                
-                st.session_state.dbscan_ran = True
-        
-        else:
-            st.info("Click 'Run DBSCAN' button to start clustering")
-    
-    # ============================================
-    # CUSTOMER PROFILES
-    # ============================================
-    elif page == "Customer Profiles":
-        st.header("Customer Segment Profiles")
-        
-        if 'kmeans_df' in st.session_state and st.session_state.kmeans_df is not None:
-            df_profiles = st.session_state.kmeans_df
-            k = st.session_state.kmeans_k
-            
-            st.subheader("Segment Characteristics")
-            
-            for cluster in range(k):
-                cluster_data = df_profiles[df_profiles['Cluster'] == cluster]
-                size = len(cluster_data)
-                percentage = size / len(df_profiles) * 100
-                
-                income = cluster_data['Annual_Income'].mean()
-                spending = cluster_data['Spending_Score'].mean()
-                age = cluster_data['Age'].mean()
-                
-                if income > 70 and spending > 60:
-                    name = "VIP Premium Customers"
-                    icon = "👑"
-                elif income > 70 and spending < 40:
-                    name = "Smart Value Shoppers"
-                    icon = "💰"
-                elif income < 40 and spending > 60:
-                    name = "Aspiring Trendsetters"
-                    icon = "🎯"
-                elif income < 40 and spending < 40:
-                    name = "Practical Frugal"
-                    icon = "🛡️"
-                elif age < 30 and spending > 60:
-                    name = "Young Trend Hunters"
-                    icon = "🔥"
-                elif age > 50 and income > 60:
-                    name = "Established Affluents"
-                    icon = "💼"
-                elif age > 50 and spending < 40:
-                    name = "Comfort Keepers"
-                    icon = "🏠"
-                else:
-                    name = "Regular Customers"
-                    icon = "⭐"
-                
-                expander_title = icon + " " + name + " - " + str(size) + " customers (" + str(round(percentage, 1)) + "%)"
-                with st.expander(expander_title):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write("**Customer Characteristics:**")
-                        st.write("• Average Age: " + str(round(cluster_data['Age'].mean(), 0)) + " years")
-                        st.write("• Average Income: $" + str(round(cluster_data['Annual_Income'].mean(), 0)) + "K")
-                        st.write("• Average Spending: " + str(round(cluster_data['Spending_Score'].mean(), 0)) + "/100")
-                        
-                        if 'Gender' in cluster_data.columns:
-                            female_pct = (cluster_data['Gender'] == 'Female').sum() / size * 100
-                            st.write("• Gender: " + str(round(female_pct, 0)) + "% Female, " + str(round(100-female_pct, 0)) + "% Male")
-                    
-                    with col2:
-                        st.write("**Marketing Strategy:**")
-                        if "VIP" in name:
-                            st.write("• Offer exclusive products and early access")
-                            st.write("• VIP loyalty program with premium benefits")
-                        elif "Smart Value" in name:
-                            st.write("• Focus on discounts, cashback, and bundle deals")
-                            st.write("• Price-match guarantees")
-                        elif "Aspiring" in name:
-                            st.write("• Social media campaigns and influencer marketing")
-                            st.write("• Flash sales and limited editions")
-                        elif "Practical" in name:
-                            st.write("• Essential items at competitive prices")
-                            st.write("• Loyalty points for everyday purchases")
-                        elif "Young" in name:
-                            st.write("• Instagram, TikTok, and mobile app marketing")
-                            st.write("• New arrivals and seasonal items")
-                        elif "Established" in name:
-                            st.write("• Quality focus and service excellence")
-                            st.write("• Email newsletters and phone support")
-                        elif "Comfort" in name:
-                            st.write("• Trust and familiarity messaging")
-                            st.write("• Traditional media and direct mail")
-                        else:
-                            st.write("• Balanced marketing approach")
-                            st.write("• Mix of digital and traditional channels")
-            
-            st.subheader("Key Insights")
-            
-            largest = max(range(k), key=lambda x: len(df_profiles[df_profiles['Cluster'] == x]))
-            largest_data = df_profiles[df_profiles['Cluster'] == largest]
-            
-            highest_spending = max(range(k), key=lambda x: df_profiles[df_profiles['Cluster'] == x]['Spending_Score'].mean())
-            highest_spending_data = df_profiles[df_profiles['Cluster'] == highest_spending]
-            
-            col1, col2 = st.columns(2)
-            col1.info("**Largest Segment**")
-            col1.write("Segment " + str(largest+1))
-            col1.write(str(len(largest_data)) + " customers")
-            
-            col2.success("**Highest Spending Segment**")
-            col2.write("Segment " + str(highest_spending+1))
-            col2.write("Avg Spending: " + str(round(highest_spending_data['Spending_Score'].mean(), 0)) + "/100")
-            
-            st.subheader("Export Data")
-            csv = df_profiles.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Segmentation Results", csv, "segmentation_results.csv")
-        
-        else:
-            st.warning("Please run K-Means clustering first")
-            st.info("Go to 'K-Means Clustering' page and click 'Run K-Means'")
-
-else:
-    st.info("Please upload a CSV file to begin")
-    
-    st.subheader("Expected CSV Format")
-    example = pd.DataFrame({
-        'CustomerID': [1, 2, 3],
-        'Gender': ['Male', 'Female', 'Female'],
-        'Age': [25, 35, 42],
-        'Annual Income (k$)': [50, 75, 100],
-        'Spending Score (1-100)': [60, 75, 85]
-    })
-    st.dataframe(example)
-""")
+    f.write("import streamlit as st\n")
+    f.write("import pandas as pd\n")
+    f.write("import numpy as np\n")
+    f.write("import matplotlib.pyplot as plt\n")
+    f.write("import seaborn as sns\n")
+    f.write("from sklearn.preprocessing import StandardScaler, LabelEncoder\n")
+    f.write("from sklearn.cluster import KMeans, DBSCAN\n")
+    f.write("from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score\n")
+    f.write("from sklearn.decomposition import PCA\n")
+    f.write("\n")
+    f.write("st.set_page_config(page_title='Customer Segmentation', layout='wide')\n")
+    f.write("st.title('Customer Segmentation Dashboard')\n")
+    f.write("\n")
+    f.write("st.sidebar.header('Upload & Settings')\n")
+    f.write("uploaded_file = st.sidebar.file_uploader('Upload CSV Dataset', type=['csv'])\n")
+    f.write("\n")
+    f.write("# Create dropdown menu in sidebar\n")
+    f.write("st.sidebar.subheader('Navigation')\n")
+    f.write("page = st.sidebar.selectbox(\n")
+    f.write("    'Choose Analysis Type',\n")
+    f.write("    ['K-Means Clustering', 'DBSCAN Clustering', 'Method Comparison', 'Customer Profiling']\n")
+    f.write(")\n")
+    f.write("\n")
+    f.write("if uploaded_file:\n")
+    f.write("    # Load data\n")
+    f.write("    df = pd.read_csv(uploaded_file)\n")
+    f.write("    st.subheader('Dataset Preview')\n")
+    f.write("    st.dataframe(df.head())\n")
+    f.write("    \n")
+    f.write("    # Preprocessing\n")
+    f.write("    df_clean = df.copy()\n")
+    f.write("    \n")
+    f.write("    # Handle column names\n")
+    f.write("    if 'Annual Income (k$)' in df_clean.columns:\n")
+    f.write("        df_clean.rename(columns={'Annual Income (k$)': 'Annual_Income'}, inplace=True)\n")
+    f.write("    if 'Spending Score (1-100)' in df_clean.columns:\n")
+    f.write("        df_clean.rename(columns={'Spending Score (1-100)': 'Spending_Score'}, inplace=True)\n")
+    f.write("    \n")
+    f.write("    # Encode Gender\n")
+    f.write("    if 'Gender' in df_clean.columns:\n")
+    f.write("        le = LabelEncoder()\n")
+    f.write("        df_clean['Gender_Encoded'] = le.fit_transform(df_clean['Gender'])\n")
+    f.write("    else:\n")
+    f.write("        df_clean['Gender_Encoded'] = 0\n")
+    f.write("    \n")
+    f.write("    # Features\n")
+    f.write("    features = ['Age', 'Annual_Income', 'Spending_Score', 'Gender_Encoded']\n")
+    f.write("    X = df_clean[features].copy()\n")
+    f.write("    \n")
+    f.write("    # Scale\n")
+    f.write("    scaler = StandardScaler()\n")
+    f.write("    X_scaled = scaler.fit_transform(X)\n")
+    f.write("    \n")
+    f.write("    # Initialize session state - start as False/None\n")
+    f.write("    if 'kmeans_ran' not in st.session_state:\n")
+    f.write("        st.session_state.kmeans_ran = False\n")
+    f.write("    if 'dbscan_ran' not in st.session_state:\n")
+    f.write("        st.session_state.dbscan_ran = False\n")
+    f.write("    if 'kmeans_labels' not in st.session_state:\n")
+    f.write("        st.session_state.kmeans_labels = None\n")
+    f.write("    if 'kmeans_k' not in st.session_state:\n")
+    f.write("        st.session_state.kmeans_k = None\n")
+    f.write("    if 'kmeans_sil' not in st.session_state:\n")
+    f.write("        st.session_state.kmeans_sil = None\n")
+    f.write("    if 'kmeans_cal' not in st.session_state:\n")
+    f.write("        st.session_state.kmeans_cal = None\n")
+    f.write("    if 'kmeans_dav' not in st.session_state:\n")
+    f.write("        st.session_state.kmeans_dav = None\n")
+    f.write("    if 'dbscan_labels' not in st.session_state:\n")
+    f.write("        st.session_state.dbscan_labels = None\n")
+    f.write("    if 'dbscan_clusters' not in st.session_state:\n")
+    f.write("        st.session_state.dbscan_clusters = None\n")
+    f.write("    if 'dbscan_noise' not in st.session_state:\n")
+    f.write("        st.session_state.dbscan_noise = None\n")
+    f.write("    if 'dbscan_sil' not in st.session_state:\n")
+    f.write("        st.session_state.dbscan_sil = None\n")
+    f.write("    if 'dbscan_eps' not in st.session_state:\n")
+    f.write("        st.session_state.dbscan_eps = None\n")
+    f.write("    if 'dbscan_min_samples' not in st.session_state:\n")
+    f.write("        st.session_state.dbscan_min_samples = None\n")
+    f.write("    if 'kmeans_df' not in st.session_state:\n")
+    f.write("        st.session_state.kmeans_df = None\n")
+    f.write("    \n")
+    f.write("    # ============================================\n")
+    f.write("    # K-MEANS CLUSTERING PAGE (FIXED k=5)\n")
+    f.write("    # ============================================\n")
+    f.write("    if page == 'K-Means Clustering':\n")
+    f.write("        st.header('K-Means Clustering')\n")
+    f.write("        \n")
+    f.write("        st.info('Based on the elbow method analysis, optimal number of clusters is 5')\n")
+    f.write("        \n")
+    f.write("        col1, col2 = st.columns([1, 2])\n")
+    f.write("        \n")
+    f.write("        with col1:\n")
+    f.write("            # Fixed k=5 based on optimal analysis\n")
+    f.write("            k_value = 5\n")
+    f.write("            st.write('**Number of Clusters: 5 (Optimal)**')\n")
+    f.write("            \n")
+    f.write("            if st.button('Run K-Means', type='primary'):\n")
+    f.write("                with st.spinner('Running K-Means...'):\n")
+    f.write("                    kmeans = KMeans(n_clusters=k_value, random_state=42, n_init=10)\n")
+    f.write("                    labels = kmeans.fit_predict(X_scaled)\n")
+    f.write("                    df_clean['Cluster'] = labels\n")
+    f.write("                    \n")
+    f.write("                    sil_score = silhouette_score(X_scaled, labels)\n")
+    f.write("                    cal_score = calinski_harabasz_score(X_scaled, labels)\n")
+    f.write("                    dav_score = davies_bouldin_score(X_scaled, labels)\n")
+    f.write("                    \n")
+    f.write("                    st.session_state.kmeans_ran = True\n")
+    f.write("                    st.session_state.kmeans_labels = labels\n")
+    f.write("                    st.session_state.kmeans_k = k_value\n")
+    f.write("                    st.session_state.kmeans_sil = sil_score\n")
+    f.write("                    st.session_state.kmeans_cal = cal_score\n")
+    f.write("                    st.session_state.kmeans_dav = dav_score\n")
+    f.write("                    st.session_state.kmeans_df = df_clean.copy()\n")
+    f.write("                    st.success('Done! Silhouette Score: ' + str(round(sil_score, 4)))\n")
+    f.write("        \n")
+    f.write("        with col2:\n")
+    f.write("            if st.session_state.kmeans_ran:\n")
+    f.write("                m1, m2, m3 = st.columns(3)\n")
+    f.write("                m1.metric('Silhouette Score', str(round(st.session_state.kmeans_sil, 4)))\n")
+    f.write("                m2.metric('Calinski-Harabasz', str(round(st.session_state.kmeans_cal, 0)))\n")
+    f.write("                m3.metric('Davies-Bouldin', str(round(st.session_state.kmeans_dav, 4)))\n")
+    f.write("        \n")
+    f.write("        # ONLY show results if K-Means has been run\n")
+    f.write("        if st.session_state.kmeans_ran:\n")
+    f.write("            st.subheader('Clustering Results')\n")
+    f.write("            \n")
+    f.write("            # PCA Visualization\n")
+    f.write("            pca = PCA(n_components=2)\n")
+    f.write("            X_pca = pca.fit_transform(X_scaled)\n")
+    f.write("            \n")
+    f.write("            fig, ax = plt.subplots(figsize=(10, 6))\n")
+    f.write("            scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=st.session_state.kmeans_labels, cmap='viridis', s=100, alpha=0.6)\n")
+    f.write("            plt.colorbar(scatter)\n")
+    f.write("            ax.set_xlabel('First Principal Component')\n")
+    f.write("            ax.set_ylabel('Second Principal Component')\n")
+    f.write("            ax.set_title('K-Means Clustering Results (5 Segments)')\n")
+    f.write("            st.pyplot(fig)\n")
+    f.write("            \n")
+    f.write("            # Show cluster sizes\n")
+    f.write("            st.subheader('Cluster Sizes')\n")
+    f.write("            cluster_sizes = pd.Series(st.session_state.kmeans_labels).value_counts().sort_index()\n")
+    f.write("            st.bar_chart(cluster_sizes)\n")
+    f.write("            \n")
+    f.write("            # ============================================\n")
+    f.write("            # SEGMENT SUMMARIZATION\n")
+    f.write("            # ============================================\n")
+    f.write("            st.subheader('Segment Summarization')\n")
+    f.write("            \n")
+    f.write("            segment_summary = []\n")
+    f.write("            for cluster in range(5):\n")
+    f.write("                cluster_data = st.session_state.kmeans_df[st.session_state.kmeans_df['Cluster'] == cluster]\n")
+    f.write("                size = len(cluster_data)\n")
+    f.write("                pct = (size / len(st.session_state.kmeans_df)) * 100\n")
+    f.write("                \n")
+    f.write("                # Calculate averages\n")
+    f.write("                avg_age = cluster_data['Age'].mean()\n")
+    f.write("                avg_income = cluster_data['Annual_Income'].mean()\n")
+    f.write("                avg_spending = cluster_data['Spending_Score'].mean()\n")
+    f.write("                \n")
+    f.write("                # Determine segment type\n")
+    f.write("                if avg_income > 70 and avg_spending > 60:\n")
+    f.write("                    segment_type = 'VIP Premium Customers'\n")
+    f.write("                    description = 'High income, high spending customers. Target with premium products.'\n")
+    f.write("                elif avg_income > 70 and avg_spending < 40:\n")
+    f.write("                    segment_type = 'Smart Value Shoppers'\n")
+    f.write("                    description = 'High income but careful spenders. Focus on value deals.'\n")
+    f.write("                elif avg_income < 40 and avg_spending > 60:\n")
+    f.write("                    segment_type = 'Aspiring Trendsetters'\n")
+    f.write("                    description = 'Budget conscious but love spending. Use social media marketing.'\n")
+    f.write("                elif avg_income < 40 and avg_spending < 40:\n")
+    f.write("                    segment_type = 'Practical Frugal'\n")
+    f.write("                    description = 'Low income, careful spenders. Focus on essential items.'\n")
+    f.write("                elif avg_age < 30 and avg_spending > 60:\n")
+    f.write("                    segment_type = 'Young Trend Hunters'\n")
+    f.write("                    description = 'Young active spenders. Use influencer marketing.'\n")
+    f.write("                elif avg_age > 50 and avg_income > 60:\n")
+    f.write("                    segment_type = 'Established Affluents'\n")
+    f.write("                    description = 'Mature stable customers. Focus on quality and service.'\n")
+    f.write("                elif avg_age > 50 and avg_spending < 40:\n")
+    f.write("                    segment_type = 'Comfort Keepers'\n")
+    f.write("                    description = 'Senior cautious spenders. Use traditional marketing.'\n")
+    f.write("                else:\n")
+    f.write("                    segment_type = 'Regular Customers'\n")
+    f.write("                    description = 'Balanced characteristics. Use mixed marketing approach.'\n")
+    f.write("                \n")
+    f.write("                segment_summary.append({\n")
+    f.write("                    'Segment': cluster + 1,\n")
+    f.write("                    'Type': segment_type,\n")
+    f.write("                    'Size': size,\n")
+    f.write("                    'Percentage': str(round(pct, 1)) + '%',\n")
+    f.write("                    'Avg Age': str(round(avg_age, 0)),\n")
+    f.write("                    'Avg Income': '$' + str(round(avg_income, 0)) + 'K',\n")
+    f.write("                    'Avg Spending': str(round(avg_spending, 0)),\n")
+    f.write("                    'Description': description\n")
+    f.write("                })\n")
+    f.write("            \n")
+    f.write("            summary_df = pd.DataFrame(segment_summary)\n")
+    f.write("            st.dataframe(summary_df, use_container_width=True)\n")
+    f.write("            \n")
+    f.write("            # Key findings\n")
+    f.write("            st.subheader('Key Findings')\n")
+    f.write("            \n")
+    f.write("            largest = max(segment_summary, key=lambda x: x['Size'])\n")
+    f.write("            highest_spending = max(segment_summary, key=lambda x: int(x['Avg Spending']))\n")
+    f.write("            highest_income = max(segment_summary, key=lambda x: int(x['Avg Income'].replace('$', '').replace('K', '')))\n")
+    f.write("            \n")
+    f.write("            col1, col2, col3 = st.columns(3)\n")
+    f.write("            col1.info('**Largest Segment**\\\\n\\\\nSegment ' + str(largest['Segment']) + ': ' + largest['Type'] + '\\\\n' + str(largest['Size']) + ' customers (' + largest['Percentage'] + ')')\n")
+    f.write("            col2.success('**Highest Spending**\\\\n\\\\nSegment ' + str(highest_spending['Segment']) + ': ' + highest_spending['Type'] + '\\\\nSpending Score: ' + highest_spending['Avg Spending'])\n")
+    f.write("            col3.warning('**Highest Income**\\\\n\\\\nSegment ' + str(highest_income['Segment']) + ': ' + highest_income['Type'] + '\\\\nIncome: ' + highest_income['Avg Income'])\n")
+    f.write("        else:\n")
+    f.write("            st.info('Click the Run K-Means button above to see results.')\n")
+    f.write("    \n")
+    f.write("    # ============================================\n")
+    f.write("    # DBSCAN CLUSTERING PAGE\n")
+    f.write("    # ============================================\n")
+    f.write("    elif page == 'DBSCAN Clustering':\n")
+    f.write("        st.header('DBSCAN Clustering')\n")
+    f.write("        \n")
+    f.write("        col1, col2 = st.columns([1, 2])\n")
+    f.write("        \n")
+    f.write("        with col1:\n")
+    f.write("            eps_value = st.slider('Epsilon (eps)', 0.1, 2.0, 0.8, 0.05)\n")
+    f.write("            min_samples_value = st.slider('Min Samples', 2, 20, 5)\n")
+    f.write("            \n")
+    f.write("            if st.button('Run DBSCAN', type='primary'):\n")
+    f.write("                with st.spinner('Running DBSCAN...'):\n")
+    f.write("                    dbscan = DBSCAN(eps=eps_value, min_samples=min_samples_value)\n")
+    f.write("                    labels = dbscan.fit_predict(X_scaled)\n")
+    f.write("                    \n")
+    f.write("                    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)\n")
+    f.write("                    n_noise = list(labels).count(-1)\n")
+    f.write("                    \n")
+    f.write("                    if n_clusters >= 2:\n")
+    f.write("                        mask = labels != -1\n")
+    f.write("                        sil_score = silhouette_score(X_scaled[mask], labels[mask])\n")
+    f.write("                    else:\n")
+    f.write("                        sil_score = -1\n")
+    f.write("                    \n")
+    f.write("                    st.session_state.dbscan_ran = True\n")
+    f.write("                    st.session_state.dbscan_labels = labels\n")
+    f.write("                    st.session_state.dbscan_clusters = n_clusters\n")
+    f.write("                    st.session_state.dbscan_noise = n_noise\n")
+    f.write("                    st.session_state.dbscan_sil = sil_score\n")
+    f.write("                    st.session_state.dbscan_eps = eps_value\n")
+    f.write("                    st.session_state.dbscan_min_samples = min_samples_value\n")
+    f.write("                    \n")
+    f.write("                    if n_clusters >= 2:\n")
+    f.write("                        st.success('Done! Found ' + str(n_clusters) + ' clusters')\n")
+    f.write("                        st.info('Silhouette Score (excluding noise): ' + str(round(sil_score, 4)))\n")
+    f.write("                    else:\n")
+    f.write("                        st.warning('Found only ' + str(n_clusters) + ' clusters. Try adjusting parameters.')\n")
+    f.write("        \n")
+    f.write("        with col2:\n")
+    f.write("            if st.session_state.dbscan_ran:\n")
+    f.write("                m1, m2, m3 = st.columns(3)\n")
+    f.write("                m1.metric('Clusters Found', st.session_state.dbscan_clusters)\n")
+    f.write("                m2.metric('Noise Points', st.session_state.dbscan_noise)\n")
+    f.write("                if st.session_state.dbscan_sil > 0:\n")
+    f.write("                    m3.metric('Silhouette Score', str(round(st.session_state.dbscan_sil, 4)))\n")
+    f.write("                else:\n")
+    f.write("                    m3.metric('Silhouette Score', 'N/A')\n")
+    f.write("        \n")
+    f.write("        # ONLY show results if DBSCAN has been run\n")
+    f.write("        if st.session_state.dbscan_ran:\n")
+    f.write("            st.subheader('Clustering Results')\n")
+    f.write("            \n")
+    f.write("            pca = PCA(n_components=2)\n")
+    f.write("            X_pca = pca.fit_transform(X_scaled)\n")
+    f.write("            \n")
+    f.write("            fig, ax = plt.subplots(figsize=(10, 6))\n")
+    f.write("            unique_labels = set(st.session_state.dbscan_labels)\n")
+    f.write("            \n")
+    f.write("            for k in unique_labels:\n")
+    f.write("                mask = st.session_state.dbscan_labels == k\n")
+    f.write("                if k == -1:\n")
+    f.write("                    ax.scatter(X_pca[mask, 0], X_pca[mask, 1], c='black', s=50, label='Noise (' + str(st.session_state.dbscan_noise) + ')', alpha=0.5)\n")
+    f.write("                else:\n")
+    f.write("                    ax.scatter(X_pca[mask, 0], X_pca[mask, 1], s=50, alpha=0.6, label='Cluster ' + str(k))\n")
+    f.write("            \n")
+    f.write("            ax.set_xlabel('First Principal Component')\n")
+    f.write("            ax.set_ylabel('Second Principal Component')\n")
+    f.write("            ax.set_title('DBSCAN Clustering Results')\n")
+    f.write("            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')\n")
+    f.write("            st.pyplot(fig)\n")
+    f.write("            \n")
+    f.write("            # Show cluster distribution\n")
+    f.write("            st.subheader('Cluster Distribution')\n")
+    f.write("            cluster_counts = pd.Series(st.session_state.dbscan_labels).value_counts()\n")
+    f.write("            st.bar_chart(cluster_counts)\n")
+    f.write("            \n")
+    f.write("            # DBSCAN Summarization\n")
+    f.write("            st.subheader('DBSCAN Summarization')\n")
+    f.write("            \n")
+    f.write("            if st.session_state.dbscan_clusters >= 2:\n")
+    f.write("                dbscan_summary = []\n")
+    f.write("                unique_clusters = [c for c in set(st.session_state.dbscan_labels) if c != -1]\n")
+    f.write("                \n")
+    f.write("                for cluster in unique_clusters:\n")
+    f.write("                    mask = st.session_state.dbscan_labels == cluster\n")
+    f.write("                    cluster_data = df_clean[mask]\n")
+    f.write("                    size = len(cluster_data)\n")
+    f.write("                    pct = (size / len(df_clean)) * 100\n")
+    f.write("                    \n")
+    f.write("                    avg_age = cluster_data['Age'].mean()\n")
+    f.write("                    avg_income = cluster_data['Annual_Income'].mean()\n")
+    f.write("                    avg_spending = cluster_data['Spending_Score'].mean()\n")
+    f.write("                    \n")
+    f.write("                    dbscan_summary.append({\n")
+    f.write("                        'Cluster': cluster,\n")
+    f.write("                        'Size': size,\n")
+    f.write("                        'Percentage': str(round(pct, 1)) + '%',\n")
+    f.write("                        'Avg Age': str(round(avg_age, 0)),\n")
+    f.write("                        'Avg Income': '$' + str(round(avg_income, 0)) + 'K',\n")
+    f.write("                        'Avg Spending': str(round(avg_spending, 0))\n")
+    f.write("                    })\n")
+    f.write("                \n")
+    f.write("                st.dataframe(pd.DataFrame(dbscan_summary), use_container_width=True)\n")
+    f.write("                \n")
+    f.write("                # Noise points info\n")
+    f.write("                if st.session_state.dbscan_noise > 0:\n")
+    f.write("                    st.warning('Noise Points: ' + str(st.session_state.dbscan_noise) + ' customers (' + str(round(st.session_state.dbscan_noise/len(df_clean)*100, 1)) + '%) could not be assigned to any cluster.')\n")
+    f.write("            else:\n")
+    f.write("                st.warning('Not enough clusters found for summarization. Try adjusting eps and min_samples parameters.')\n")
+    f.write("        else:\n")
+    f.write("            st.info('Click the Run DBSCAN button above to see results.')\n")
+    f.write("    \n")
+    f.write("    # ============================================\n")
+    f.write("    # METHOD COMPARISON PAGE\n")
+    f.write("    # ============================================\n")
+    f.write("    elif page == 'Method Comparison':\n")
+    f.write("        st.header('Algorithm Comparison')\n")
+    f.write("        \n")
+    f.write("        if st.session_state.kmeans_ran and st.session_state.dbscan_ran:\n")
+    f.write("            comparison_data = {\n")
+    f.write("                'Algorithm': ['K-Means', 'DBSCAN'],\n")
+    f.write("                'Silhouette Score': [str(round(st.session_state.kmeans_sil, 4)), str(round(st.session_state.dbscan_sil, 4)) if st.session_state.dbscan_sil > 0 else 'N/A'],\n")
+    f.write("                'Number of Segments': [st.session_state.kmeans_k, st.session_state.dbscan_clusters],\n")
+    f.write("                'Noise Points': ['None (0)', str(st.session_state.dbscan_noise) + ' customers']\n")
+    f.write("            }\n")
+    f.write("            \n")
+    f.write("            comparison_df = pd.DataFrame(comparison_data)\n")
+    f.write("            st.dataframe(comparison_df, use_container_width=True)\n")
+    f.write("            \n")
+    f.write("            st.subheader('Visual Comparison')\n")
+    f.write("            \n")
+    f.write("            pca = PCA(n_components=2)\n")
+    f.write("            X_pca = pca.fit_transform(X_scaled)\n")
+    f.write("            \n")
+    f.write("            fig, axes = plt.subplots(1, 2, figsize=(14, 5))\n")
+    f.write("            \n")
+    f.write("            axes[0].scatter(X_pca[:, 0], X_pca[:, 1], c=st.session_state.kmeans_labels, cmap='viridis', s=50, alpha=0.6)\n")
+    f.write("            axes[0].set_title('K-Means Clustering (5 Segments)')\n")
+    f.write("            axes[0].set_xlabel('PC1')\n")
+    f.write("            axes[0].set_ylabel('PC2')\n")
+    f.write("            \n")
+    f.write("            unique_labels = set(st.session_state.dbscan_labels)\n")
+    f.write("            for k in unique_labels:\n")
+    f.write("                mask = st.session_state.dbscan_labels == k\n")
+    f.write("                if k == -1:\n")
+    f.write("                    axes[1].scatter(X_pca[mask, 0], X_pca[mask, 1], c='black', s=50, label='Noise', alpha=0.5)\n")
+    f.write("                else:\n")
+    f.write("                    axes[1].scatter(X_pca[mask, 0], X_pca[mask, 1], s=50, alpha=0.6, label='Cluster ' + str(k))\n")
+    f.write("            axes[1].set_title('DBSCAN Clustering')\n")
+    f.write("            axes[1].set_xlabel('PC1')\n")
+    f.write("            axes[1].set_ylabel('PC2')\n")
+    f.write("            axes[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')\n")
+    f.write("            \n")
+    f.write("            plt.tight_layout()\n")
+    f.write("            st.pyplot(fig)\n")
+    f.write("            \n")
+    f.write("            # Recommendation\n")
+    f.write("            st.subheader('Recommendation')\n")
+    f.write("            if st.session_state.kmeans_sil > st.session_state.dbscan_sil:\n")
+    f.write("                st.success('K-Means performs better for your data with a higher silhouette score.')\n")
+    f.write("            else:\n")
+    f.write("                st.success('DBSCAN performs better for your data with a higher silhouette score.')\n")
+    f.write("        else:\n")
+    f.write("            st.warning('Please run both K-Means and DBSCAN first')\n")
+    f.write("            if not st.session_state.kmeans_ran:\n")
+    f.write("                st.info('Go to K-Means Clustering page and click Run K-Means')\n")
+    f.write("            if not st.session_state.dbscan_ran:\n")
+    f.write("                st.info('Go to DBSCAN Clustering page and click Run DBSCAN')\n")
+    f.write("    \n")
+    f.write("    # ============================================\n")
+    f.write("    # CUSTOMER PROFILING PAGE\n")
+    f.write("    # ============================================\n")
+    f.write("    elif page == 'Customer Profiling':\n")
+    f.write("        st.header('Customer Segment Profiles')\n")
+    f.write("        \n")
+    f.write("        if st.session_state.kmeans_ran and st.session_state.kmeans_df is not None:\n")
+    f.write("            st.subheader('K-Means Segment Profiles (5 Segments)')\n")
+    f.write("            \n")
+    f.write("            segment_details = []\n")
+    f.write("            \n")
+    f.write("            for cluster in range(st.session_state.kmeans_k):\n")
+    f.write("                cluster_data = st.session_state.kmeans_df[st.session_state.kmeans_df['Cluster'] == cluster]\n")
+    f.write("                \n")
+    f.write("                size = len(cluster_data)\n")
+    f.write("                percentage = (size / len(st.session_state.kmeans_df)) * 100\n")
+    f.write("                age_mean = cluster_data['Age'].mean()\n")
+    f.write("                income_mean = cluster_data['Annual_Income'].mean()\n")
+    f.write("                spending_mean = cluster_data['Spending_Score'].mean()\n")
+    f.write("                \n")
+    f.write("                if 'Gender' in cluster_data.columns:\n")
+    f.write("                    female_pct = (cluster_data['Gender'] == 'Female').sum() / size * 100\n")
+    f.write("                    male_pct = 100 - female_pct\n")
+    f.write("                else:\n")
+    f.write("                    female_pct, male_pct = 50, 50\n")
+    f.write("                \n")
+    f.write("                if income_mean > 70 and spending_mean > 60:\n")
+    f.write("                    segment_name = 'VIP Premium Customers'\n")
+    f.write("                elif income_mean > 70 and spending_mean < 40:\n")
+    f.write("                    segment_name = 'Smart Value Shoppers'\n")
+    f.write("                elif income_mean < 40 and spending_mean > 60:\n")
+    f.write("                    segment_name = 'Aspiring Trendsetters'\n")
+    f.write("                elif income_mean < 40 and spending_mean < 40:\n")
+    f.write("                    segment_name = 'Practical Frugal'\n")
+    f.write("                elif age_mean < 30 and spending_mean > 60:\n")
+    f.write("                    segment_name = 'Young Trend Hunters'\n")
+    f.write("                elif age_mean > 50 and income_mean > 60:\n")
+    f.write("                    segment_name = 'Established Affluents'\n")
+    f.write("                elif age_mean > 50 and spending_mean < 40:\n")
+    f.write("                    segment_name = 'Comfort Keepers'\n")
+    f.write("                else:\n")
+    f.write("                    segment_name = 'Regular Customers'\n")
+    f.write("                \n")
+    f.write("                segment_details.append({\n")
+    f.write("                    'Segment': cluster + 1,\n")
+    f.write("                    'Name': segment_name,\n")
+    f.write("                    'Size': size,\n")
+    f.write("                    'Percentage': str(round(percentage, 1)) + '%',\n")
+    f.write("                    'Avg Age': str(round(age_mean, 0)),\n")
+    f.write("                    'Avg Income': '$' + str(round(income_mean, 0)) + 'K',\n")
+    f.write("                    'Avg Spending': str(round(spending_mean, 0)),\n")
+    f.write("                    'Gender': str(round(female_pct, 0)) + '% F / ' + str(round(male_pct, 0)) + '% M'\n")
+    f.write("                })\n")
+    f.write("            \n")
+    f.write("            st.dataframe(pd.DataFrame(segment_details), use_container_width=True)\n")
+    f.write("            \n")
+    f.write("            # Export\n")
+    f.write("            st.subheader('Export Data')\n")
+    f.write("            csv = st.session_state.kmeans_df.to_csv(index=False).encode('utf-8')\n")
+    f.write("            st.download_button('Download Segmentation Results (CSV)', csv, 'segmentation_results.csv')\n")
+    f.write("        else:\n")
+    f.write("            st.warning('Please run K-Means clustering first')\n")
+    f.write("            st.info('Go to K-Means Clustering page and click Run K-Means')\n")
+    f.write("\n")
+    f.write("else:\n")
+    f.write("    st.info('Please upload a CSV file to begin')\n")
+    f.write("    \n")
+    f.write("    st.subheader('Expected CSV Format')\n")
+    f.write("    example = pd.DataFrame({\n")
+    f.write("        'CustomerID': [1, 2, 3, 4, 5],\n")
+    f.write("        'Gender': ['Male', 'Female', 'Female', 'Male', 'Female'],\n")
+    f.write("        'Age': [25, 35, 42, 28, 50],\n")
+    f.write("        'Annual Income (k$)': [50, 75, 100, 60, 80],\n")
+    f.write("        'Spending Score (1-100)': [60, 75, 85, 70, 65]\n")
+    f.write("    })\n")
+    f.write("    st.dataframe(example)\n")
+    f.write("    \n")
+    f.write("    st.subheader('How to Use')\n")
+    f.write("    st.markdown('1. Upload your customer CSV file')\n")
+    f.write("    st.markdown('2. Select analysis type from dropdown menu')\n")
+    f.write("    st.markdown('3. Click Run button to perform clustering')\n")
+    f.write("    st.markdown('4. View results and segment profiles')\n")
+    f.write("    st.markdown('5. Download results for your marketing team')\n")
 
 print("Streamlit app created successfully!")
