@@ -1,4 +1,4 @@
-# COMPLETE WORKING VERSION - With Marketing Budget & Elbow Method after Run
+# COMPLETE WORKING VERSION - Marketing Budget moved to Customer Profiling
 import os
 
 if os.path.exists('streamlit_app.py'):
@@ -62,11 +62,9 @@ if uploaded_file:
     if page == "K-Means Clustering":
         st.header("K-Means Clustering")
         
-        # Slider that remembers value
         k_value = st.slider("Number of Clusters (k)", 2, 10, st.session_state.kmeans_k_value, key="kmeans_slider")
         st.session_state.kmeans_k_value = k_value
         
-        # Run button - results only show after clicking this
         if st.button("Run K-Means", type="primary"):
             with st.spinner("Running K-Means..."):
                 kmeans = KMeans(n_clusters=k_value, random_state=42, n_init=10)
@@ -87,25 +85,23 @@ if uploaded_file:
                 }
                 st.rerun()
         
-        # Results only show if kmeans_result exists
         if st.session_state.kmeans_result is not None:
             res = st.session_state.kmeans_result
             kmeans_model = res.get('model')
             
             st.success(f"K-Means completed successfully with k={res['k']}!")
             
-            # ========== SMART RECOMMENDATION ==========
-            st.subheader("💡 Recommendation")
-            
+            # Recommendation
+            st.subheader("Recommendation")
             if res['silhouette'] > 0.5:
-                st.success(f"✅ Great! Your chosen k={res['k']} gives a good silhouette score of {res['silhouette']:.4f}")
+                st.success(f"Great! Your chosen k={res['k']} gives a good silhouette score of {res['silhouette']:.4f}")
             elif res['silhouette'] > 0.3:
-                st.warning(f"⚠️ Your chosen k={res['k']} gives an average silhouette score of {res['silhouette']:.4f}")
+                st.warning(f"Your chosen k={res['k']} gives an average silhouette score of {res['silhouette']:.4f}")
             else:
-                st.error(f"❌ Your chosen k={res['k']} gives a poor silhouette score of {res['silhouette']:.4f}")
+                st.error(f"Your chosen k={res['k']} gives a poor silhouette score of {res['silhouette']:.4f}")
             
-            # ========== ELBOW METHOD (AFTER RUN) ==========
-            st.subheader("📊 Elbow Method Analysis")
+            # Elbow Method
+            st.subheader("Elbow Method Analysis")
             with st.spinner("Calculating Elbow Method..."):
                 inertias = []
                 K_range = range(2, 11)
@@ -117,13 +113,10 @@ if uploaded_file:
                 fig_elbow, ax_elbow = plt.subplots(figsize=(10, 6))
                 ax_elbow.plot(K_range, inertias, 'bo-', linewidth=2, markersize=8)
                 ax_elbow.set_xlabel('Number of Clusters (k)', fontsize=12)
-                ax_elbow.set_ylabel('Inertia (Within-cluster sum of squares)', fontsize=12)
+                ax_elbow.set_ylabel('Inertia', fontsize=12)
                 ax_elbow.set_title('Elbow Method for Optimal k', fontsize=14, fontweight='bold')
-                
-                # Highlight the chosen k
                 ax_elbow.axvline(x=res['k'], color='red', linestyle='--', linewidth=2, label=f'Your chosen k={res["k"]}')
                 
-                # Find the elbow point
                 diffs = np.diff(inertias)
                 if len(diffs) >= 2:
                     elbow_point = K_range[np.argmin(diffs) + 1]
@@ -132,38 +125,25 @@ if uploaded_file:
                 ax_elbow.legend()
                 plt.tight_layout()
                 st.pyplot(fig_elbow)
-                
-                if len(diffs) >= 2:
-                    elbow_point = K_range[np.argmin(diffs) + 1]
-                    if elbow_point != res['k']:
-                        st.info(f"📊 The elbow method suggests k={elbow_point} might be better than your chosen k={res['k']}. Try running again with k={elbow_point}.")
-                    else:
-                        st.success(f"✅ Great! Your chosen k={res['k']} matches the elbow method recommendation.")
             
             col1, col2, col3 = st.columns(3)
-            col1.metric("Silhouette Score", f"{res['silhouette']:.4f}", help="Higher is better (0.5+ is good)")
-            col2.metric("Calinski-Harabasz", f"{res['calinski']:.0f}", help="Higher is better")
-            col3.metric("Davies-Bouldin", f"{res['davies']:.4f}", help="Lower is better")
+            col1.metric("Silhouette Score", f"{res['silhouette']:.4f}")
+            col2.metric("Calinski-Harabasz", f"{res['calinski']:.0f}")
+            col3.metric("Davies-Bouldin", f"{res['davies']:.4f}")
             
             st.subheader("Clustering Results - PCA Visualization")
             
-            # PCA transformation
             pca = PCA(n_components=2)
             X_pca = pca.fit_transform(X_scaled)
             
-            # Create figure
             fig, ax = plt.subplots(figsize=(12, 8))
-            
-            # Plot clusters
             scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=res['labels'], cmap='viridis', s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
             
-            # Plot cluster centers (RED X marks)
             if kmeans_model is not None:
                 centers_pca = pca.transform(kmeans_model.cluster_centers_)
                 ax.scatter(centers_pca[:, 0], centers_pca[:, 1], s=400, c='red', marker='X', 
                           edgecolors='black', linewidth=3, label='Cluster Centers', zorder=5)
                 
-                # Add labels for each center
                 for i, center in enumerate(centers_pca):
                     ax.annotate(f'Center {i}', (center[0], center[1]), 
                                fontsize=12, fontweight='bold', ha='center', va='bottom',
@@ -177,14 +157,13 @@ if uploaded_file:
             plt.tight_layout()
             st.pyplot(fig)
             
-            # Customer Lifetime Value (CLV) Calculation
-            st.subheader("💰 Customer Lifetime Value by Segment")
+            # Customer Lifetime Value
+            st.subheader("Customer Lifetime Value by Segment")
             df_with_clv = res['df'].copy()
             df_with_clv['Estimated_CLV'] = df_with_clv['Annual_Income'] * (df_with_clv['Spending_Score'] / 100) * 0.1
             clv_by_segment = df_with_clv.groupby('Cluster')['Estimated_CLV'].mean()
             st.bar_chart(clv_by_segment)
             
-            # Display CLV table
             clv_data = []
             for cluster in range(res['k']):
                 cluster_data = df_with_clv[df_with_clv['Cluster'] == cluster]
@@ -196,10 +175,11 @@ if uploaded_file:
                 })
             st.dataframe(pd.DataFrame(clv_data), use_container_width=True)
             
-            # ========== MARKETING BUDGET ALLOCATION (SEPARATE SECTION) ==========
-            st.subheader("📢 Recommended Marketing Budget Allocation")
+            st.subheader("Cluster Sizes")
+            cluster_sizes = pd.Series(res['labels']).value_counts().sort_index()
+            st.bar_chart(cluster_sizes)
             
-            # Create segment summary first
+            st.subheader("Segment Summary - What Each Cluster Means")
             summary_data = []
             for cluster in range(res['k']):
                 cluster_data = res['df'][res['df']['Cluster'] == cluster]
@@ -211,102 +191,41 @@ if uploaded_file:
                 
                 if avg_income > 70 and avg_spending > 60:
                     name = "VIP Premium Customers"
+                    meaning = "High income, high spending - Your best customers"
                 elif avg_income > 70 and avg_spending < 40:
                     name = "Smart Value Shoppers"
+                    meaning = "High income but careful spenders - Focus on value deals"
                 elif avg_income < 40 and avg_spending > 60:
                     name = "Aspiring Trendsetters"
+                    meaning = "Lower income but love spending - Use social media"
                 elif avg_income < 40 and avg_spending < 40:
                     name = "Practical Frugal"
+                    meaning = "Budget conscious - Focus on essential items"
                 elif avg_age < 30 and avg_spending > 60:
                     name = "Young Trend Hunters"
+                    meaning = "Young active spenders - Use influencer marketing"
                 elif avg_age > 50 and avg_income > 60:
                     name = "Established Affluents"
+                    meaning = "Mature stable customers - Focus on quality"
                 elif avg_age > 50 and avg_spending < 40:
                     name = "Comfort Keepers"
+                    meaning = "Senior cautious spenders - Traditional marketing"
                 else:
                     name = "Regular Customers"
+                    meaning = "Balanced customers - Mixed marketing approach"
                 
                 summary_data.append({
                     "Cluster": cluster,
                     "Segment Name": name,
-                    "Size": size,
-                    "Pct": pct,
-                    "Avg Age": avg_age,
-                    "Avg Income": avg_income,
-                    "Avg Spending": avg_spending
-                })
-            
-            # Marketing budget allocation
-            budget_data = []
-            total_budget = 100
-            remaining_budget = total_budget
-            
-            for seg in summary_data:
-                if "VIP" in seg['Segment Name'] or "Premium" in seg['Segment Name']:
-                    budget_pct = 35
-                elif "Trend" in seg['Segment Name'] or "Young" in seg['Segment Name']:
-                    budget_pct = 25
-                elif "Value" in seg['Segment Name'] or "Smart" in seg['Segment Name']:
-                    budget_pct = 20
-                elif "Frugal" in seg['Segment Name'] or "Practical" in seg['Segment Name']:
-                    budget_pct = 10
-                elif "Comfort" in seg['Segment Name'] or "Senior" in seg['Segment Name']:
-                    budget_pct = 5
-                else:
-                    budget_pct = 5
-                
-                budget_data.append({
-                    'Segment': seg['Segment Name'],
-                    'Customers': seg['Size'],
-                    'Percentage of Customers': f"{seg['Pct']:.1f}%",
-                    'Marketing Budget': f"{budget_pct}%",
-                    'Priority': 'High' if budget_pct >= 20 else 'Medium' if budget_pct >= 10 else 'Low'
-                })
-            
-            st.dataframe(pd.DataFrame(budget_data), use_container_width=True)
-            
-            # Display budget chart
-            budget_chart_data = {item['Segment']: int(item['Marketing Budget'].replace('%', '')) for item in budget_data}
-            st.bar_chart(pd.Series(budget_chart_data))
-            
-            st.info("💡 **Marketing Strategy Tip:** Allocate more budget to high-value segments (VIP, Trendsetters) for maximum ROI. Focus retention efforts on these groups.")
-            
-            st.subheader("Cluster Sizes")
-            cluster_sizes = pd.Series(res['labels']).value_counts().sort_index()
-            st.bar_chart(cluster_sizes)
-            
-            st.subheader("Segment Summary - What Each Cluster Means")
-            final_summary = []
-            for seg in summary_data:
-                if seg['Avg Income'] > 70 and seg['Avg Spending'] > 60:
-                    meaning = "High income, high spending - Your best customers"
-                elif seg['Avg Income'] > 70 and seg['Avg Spending'] < 40:
-                    meaning = "High income but careful spenders - Focus on value deals"
-                elif seg['Avg Income'] < 40 and seg['Avg Spending'] > 60:
-                    meaning = "Lower income but love spending - Use social media"
-                elif seg['Avg Income'] < 40 and seg['Avg Spending'] < 40:
-                    meaning = "Budget conscious - Focus on essential items"
-                elif seg['Avg Age'] < 30 and seg['Avg Spending'] > 60:
-                    meaning = "Young active spenders - Use influencer marketing"
-                elif seg['Avg Age'] > 50 and seg['Avg Income'] > 60:
-                    meaning = "Mature stable customers - Focus on quality"
-                elif seg['Avg Age'] > 50 and seg['Avg Spending'] < 40:
-                    meaning = "Senior cautious spenders - Traditional marketing"
-                else:
-                    meaning = "Balanced customers - Mixed marketing approach"
-                
-                final_summary.append({
-                    "Cluster": seg['Cluster'],
-                    "Segment Name": seg['Segment Name'],
-                    "Size": f"{seg['Size']} ({seg['Pct']:.1f}%)",
-                    "Avg Age": f"{seg['Avg Age']:.0f}",
-                    "Avg Income": f"${seg['Avg Income']:.0f}K",
-                    "Avg Spending": f"{seg['Avg Spending']:.0f}",
+                    "Size": f"{size} ({pct:.1f}%)",
+                    "Avg Age": f"{avg_age:.0f}",
+                    "Avg Income": f"${avg_income:.0f}K",
+                    "Avg Spending": f"{avg_spending:.0f}",
                     "What This Means": meaning
                 })
-            st.dataframe(pd.DataFrame(final_summary), use_container_width=True)
+            st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
         else:
-            st.info("👈 Click the 'Run K-Means' button to see results")
+            st.info("Click the 'Run K-Means' button to see results")
     
     # ========== DBSCAN CLUSTERING ==========
     elif page == "DBSCAN Clustering":
@@ -418,7 +337,7 @@ if uploaded_file:
             else:
                 st.warning("Not enough clusters found. Try adjusting eps and min_samples.")
         else:
-            st.info("👈 Click the 'Run DBSCAN' button to see results")
+            st.info("Click the 'Run DBSCAN' button to see results")
     
     # ========== METHOD COMPARISON ==========
     elif page == "Method Comparison":
@@ -489,7 +408,7 @@ if uploaded_file:
             if not dbscan_done:
                 st.info("Go to DBSCAN Clustering page and click Run DBSCAN")
     
-    # ========== CUSTOMER PROFILING ==========
+    # ========== CUSTOMER PROFILING (with Marketing Budget) ==========
     elif page == "Customer Profiling":
         st.header("Customer Segment Profiles")
         
@@ -556,6 +475,60 @@ if uploaded_file:
             
             st.dataframe(pd.DataFrame(table_data), use_container_width=True)
             
+            # ========== MARKETING BUDGET ALLOCATION (NEW SECTION) ==========
+            st.subheader("📢 Recommended Marketing Budget Allocation")
+            
+            budget_data = []
+            for seg in segment_details:
+                if "VIP" in seg['name'] or "Premium" in seg['name']:
+                    budget_pct = 35
+                    priority = "High"
+                    strategy = "Exclusive offers, VIP events, early access"
+                elif "Trend" in seg['name'] or "Young" in seg['name'] or "Hunter" in seg['name']:
+                    budget_pct = 25
+                    priority = "High"
+                    strategy = "Social media campaigns, influencer marketing, flash sales"
+                elif "Value" in seg['name'] or "Smart" in seg['name']:
+                    budget_pct = 20
+                    priority = "Medium"
+                    strategy = "Discounts, cashback, bundle deals, price-match"
+                elif "Frugal" in seg['name'] or "Practical" in seg['name']:
+                    budget_pct = 10
+                    priority = "Medium"
+                    strategy = "Essential items, loyalty points, value bundles"
+                elif "Comfort" in seg['name'] or "Senior" in seg['name']:
+                    budget_pct = 5
+                    priority = "Low"
+                    strategy = "Traditional media, direct mail, trust messaging"
+                else:
+                    budget_pct = 5
+                    priority = "Low"
+                    strategy = "Balanced marketing, multi-channel approach"
+                
+                budget_data.append({
+                    'Segment': seg['name'],
+                    'Customers': seg['size'],
+                    'Customer %': f"{seg['pct']:.1f}%",
+                    'Budget %': f"{budget_pct}%",
+                    'Priority': priority,
+                    'Recommended Strategy': strategy
+                })
+            
+            st.dataframe(pd.DataFrame(budget_data), use_container_width=True)
+            
+            # Budget pie chart
+            fig_budget, ax_budget = plt.subplots(figsize=(8, 6))
+            budget_pcts = [int(item['Budget %'].replace('%', '')) for item in budget_data]
+            budget_labels = [item['Segment'][:15] for item in budget_data]
+            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#D4A5A5', '#9B59B6', '#3498DB']
+            ax_budget.pie(budget_pcts, labels=budget_labels, autopct='%1.1f%%', colors=colors[:len(budget_data)], startangle=90)
+            ax_budget.set_title('Marketing Budget Distribution by Segment', fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            st.pyplot(fig_budget)
+            
+            st.info("💡 **Marketing Strategy Tip:** Focus 60% of budget on High priority segments (VIP & Trendsetters) for maximum ROI. Use targeted campaigns for Medium priority segments. Maintain presence for Low priority segments with automated marketing.")
+            
+            # Original charts
             col1, col2, col3 = st.columns(3)
             
             with col1:
