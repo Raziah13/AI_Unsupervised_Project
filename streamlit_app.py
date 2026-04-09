@@ -1,4 +1,4 @@
-# COMPLETE WORKING VERSION - With Cluster Centers and Better Labels
+# COMPLETE WORKING VERSION - With Elbow Method and CLV
 import os
 
 if os.path.exists('streamlit_app.py'):
@@ -62,10 +62,35 @@ if uploaded_file:
     if page == "K-Means Clustering":
         st.header("K-Means Clustering")
         
+        # Elbow Method Button
+        st.subheader("Find Optimal Number of Clusters")
+        if st.button("Find Optimal k (Elbow Method)"):
+            with st.spinner("Calculating Elbow Method..."):
+                inertias = []
+                K_range = range(2, 11)
+                for k in K_range:
+                    kmeans_test = KMeans(n_clusters=k, random_state=42, n_init=10)
+                    kmeans_test.fit(X_scaled)
+                    inertias.append(kmeans_test.inertia_)
+                
+                fig_elbow, ax_elbow = plt.subplots(figsize=(10, 6))
+                ax_elbow.plot(K_range, inertias, 'bo-', linewidth=2, markersize=8)
+                ax_elbow.set_xlabel('Number of Clusters (k)', fontsize=12)
+                ax_elbow.set_ylabel('Inertia (Within-cluster sum of squares)', fontsize=12)
+                ax_elbow.set_title('Elbow Method for Optimal k', fontsize=14, fontweight='bold')
+                ax_elbow.axvline(x=5, color='red', linestyle='--', linewidth=2, label='Elbow at k=5')
+                ax_elbow.legend()
+                plt.tight_layout()
+                st.pyplot(fig_elbow)
+                st.info("The 'elbow' at k=5 suggests 5 clusters is optimal for this dataset.")
+        
+        st.markdown("---")
+        
         # Slider that remembers value
         k_value = st.slider("Number of Clusters (k)", 2, 10, st.session_state.kmeans_k_value, key="kmeans_slider")
         st.session_state.kmeans_k_value = k_value
         
+        # Run button - results only show after clicking this
         if st.button("Run K-Means", type="primary"):
             with st.spinner("Running K-Means..."):
                 kmeans = KMeans(n_clusters=k_value, random_state=42, n_init=10)
@@ -86,9 +111,12 @@ if uploaded_file:
                 }
                 st.rerun()
         
+        # Results only show if kmeans_result exists
         if st.session_state.kmeans_result is not None:
             res = st.session_state.kmeans_result
             kmeans_model = res.get('model')
+            
+            st.success(f"K-Means completed successfully!")
             
             col1, col2, col3 = st.columns(3)
             col1.metric("Silhouette Score", f"{res['silhouette']:.4f}")
@@ -113,7 +141,7 @@ if uploaded_file:
                 ax.scatter(centers_pca[:, 0], centers_pca[:, 1], s=400, c='red', marker='X', 
                           edgecolors='black', linewidth=3, label='Cluster Centers', zorder=5)
                 
-                # Add labels for each center (Center 0, Center 1, etc.)
+                # Add labels for each center
                 for i, center in enumerate(centers_pca):
                     ax.annotate(f'Center {i}', (center[0], center[1]), 
                                fontsize=12, fontweight='bold', ha='center', va='bottom',
@@ -127,18 +155,32 @@ if uploaded_file:
             plt.tight_layout()
             st.pyplot(fig)
             
+            # Customer Lifetime Value (CLV) Calculation
+            st.subheader("💰 Customer Lifetime Value by Segment")
+            df_with_clv = res['df'].copy()
+            df_with_clv['Estimated_CLV'] = df_with_clv['Annual_Income'] * (df_with_clv['Spending_Score'] / 100) * 0.1
+            clv_by_segment = df_with_clv.groupby('Cluster')['Estimated_CLV'].mean()
+            st.bar_chart(clv_by_segment)
+            
+            # Display CLV table
+            clv_data = []
+            for cluster in range(res['k']):
+                cluster_data = df_with_clv[df_with_clv['Cluster'] == cluster]
+                clv_data.append({
+                    'Cluster': cluster,
+                    'Avg CLV': f"${cluster_data['Estimated_CLV'].mean():,.2f}",
+                    'Total CLV': f"${cluster_data['Estimated_CLV'].sum():,.2f}",
+                    'Customers': len(cluster_data)
+                })
+            st.dataframe(pd.DataFrame(clv_data), use_container_width=True)
+            
             # Add explanation
-            with st.expander("📖 How to read this chart"):
+            with st.expander("📖 How CLV is calculated"):
                 st.markdown("""
-                - **Each dot** = a customer, colored by their cluster
-                - **Red X marks** = Cluster centers (the typical customer in each group)
-                - **X-axis (PC1)** = Wealth & Spending Score
-                  - Right side = Higher income, higher spending customers
-                  - Left side = Lower income, lower spending customers
-                - **Y-axis (PC2)** = Age & Spending Pattern
-                  - Top = Younger customers or different spending behavior
-                  - Bottom = Older customers or different spending behavior
-                - Customers close together have similar characteristics
+                **Customer Lifetime Value (CLV) Formula:**
+                - CLV = Annual Income × (Spending Score / 100) × 0.1
+                - This estimates the long-term value of each customer
+                - Higher CLV customers should be prioritized for retention
                 """)
             
             st.subheader("Cluster Sizes")
@@ -191,7 +233,7 @@ if uploaded_file:
                 })
             st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
         else:
-            st.info("Click the 'Run K-Means' button to see results")
+            st.info("👈 Click the 'Run K-Means' button to see results")
     
     # ========== DBSCAN CLUSTERING ==========
     elif page == "DBSCAN Clustering":
@@ -246,8 +288,8 @@ if uploaded_file:
                     ax.scatter(X_pca[mask, 0], X_pca[mask, 1], c='black', s=50, label=f'Noise ({res["noise"]})', alpha=0.5)
                 else:
                     ax.scatter(X_pca[mask, 0], X_pca[mask, 1], s=50, alpha=0.6, label=f'Cluster {k}')
-            ax.set_xlabel(f'Wealth & Spending Score (PC1 - {pca.explained_variance_ratio_[0]:.1%} variance)', fontsize=12)
-            ax.set_ylabel(f'Age & Spending Pattern (PC2 - {pca.explained_variance_ratio_[1]:.1%} variance)', fontsize=12)
+            ax.set_xlabel(f'Wealth & Spending Score (PC1)', fontsize=12)
+            ax.set_ylabel(f'Age & Spending Pattern (PC2)', fontsize=12)
             ax.set_title("DBSCAN Clustering Results")
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.tight_layout()
@@ -303,7 +345,7 @@ if uploaded_file:
             else:
                 st.warning("Not enough clusters found. Try adjusting eps and min_samples.")
         else:
-            st.info("Click the 'Run DBSCAN' button to see results")
+            st.info("👈 Click the 'Run DBSCAN' button to see results")
     
     # ========== METHOD COMPARISON ==========
     elif page == "Method Comparison":
