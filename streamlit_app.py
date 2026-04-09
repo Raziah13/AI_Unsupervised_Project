@@ -1,4 +1,4 @@
-# COMPLETE WORKING VERSION - With Elbow Method and CLV
+# COMPLETE WORKING VERSION - With Smart Recommendations
 import os
 
 if os.path.exists('streamlit_app.py'):
@@ -62,12 +62,16 @@ if uploaded_file:
     if page == "K-Means Clustering":
         st.header("K-Means Clustering")
         
-        # Elbow Method Button
+        # Slider that remembers value
+        k_value = st.slider("Number of Clusters (k)", 2, 10, st.session_state.kmeans_k_value, key="kmeans_slider")
+        st.session_state.kmeans_k_value = k_value
+        
+        # Elbow Method Button - uses slider value as max range
         st.subheader("Find Optimal Number of Clusters")
-        if st.button("Find Optimal k (Elbow Method)"):
-            with st.spinner("Calculating Elbow Method..."):
+        if st.button(f"Find Optimal k (Elbow Method) - Testing k=2 to {k_value}"):
+            with st.spinner(f"Calculating Elbow Method for k=2 to {k_value}..."):
                 inertias = []
-                K_range = range(2, 11)
+                K_range = range(2, k_value + 1)
                 for k in K_range:
                     kmeans_test = KMeans(n_clusters=k, random_state=42, n_init=10)
                     kmeans_test.fit(X_scaled)
@@ -77,18 +81,24 @@ if uploaded_file:
                 ax_elbow.plot(K_range, inertias, 'bo-', linewidth=2, markersize=8)
                 ax_elbow.set_xlabel('Number of Clusters (k)', fontsize=12)
                 ax_elbow.set_ylabel('Inertia (Within-cluster sum of squares)', fontsize=12)
-                ax_elbow.set_title('Elbow Method for Optimal k', fontsize=14, fontweight='bold')
-                ax_elbow.axvline(x=5, color='red', linestyle='--', linewidth=2, label='Elbow at k=5')
-                ax_elbow.legend()
+                ax_elbow.set_title(f'Elbow Method for Optimal k (k=2 to {k_value})', fontsize=14, fontweight='bold')
+                
+                # Find the elbow point (where decrease slows down)
+                if len(inertias) >= 2:
+                    # Calculate differences to find elbow
+                    diffs = np.diff(inertias)
+                    if len(diffs) >= 2:
+                        elbow_point = K_range[np.argmin(diffs) + 1]
+                        ax_elbow.axvline(x=elbow_point, color='red', linestyle='--', linewidth=2, label=f'Elbow at k={elbow_point}')
+                        ax_elbow.legend()
+                        st.info(f"📊 The 'elbow' suggests k={elbow_point} is optimal for this dataset.")
+                    else:
+                        ax_elbow.legend()
+                
                 plt.tight_layout()
                 st.pyplot(fig_elbow)
-                st.info("The 'elbow' at k=5 suggests 5 clusters is optimal for this dataset.")
         
         st.markdown("---")
-        
-        # Slider that remembers value
-        k_value = st.slider("Number of Clusters (k)", 2, 10, st.session_state.kmeans_k_value, key="kmeans_slider")
-        st.session_state.kmeans_k_value = k_value
         
         # Run button - results only show after clicking this
         if st.button("Run K-Means", type="primary"):
@@ -116,12 +126,29 @@ if uploaded_file:
             res = st.session_state.kmeans_result
             kmeans_model = res.get('model')
             
-            st.success(f"K-Means completed successfully!")
+            st.success(f"K-Means completed successfully with k={res['k']}!")
+            
+            # ========== SMART RECOMMENDATION ==========
+            st.subheader("💡 Recommendation")
+            
+            # Suggest whether to use Elbow Method or PCA based on silhouette score
+            if res['silhouette'] > 0.5:
+                st.success(f"✅ Great! Your chosen k={res['k']} gives a good silhouette score of {res['silhouette']:.4f}")
+                st.info("📊 **Recommendation:** Use PCA Visualization to understand the cluster separation.")
+                st.write("PCA will help you see how well-separated your clusters are in 2D space.")
+            elif res['silhouette'] > 0.3:
+                st.warning(f"⚠️ Your chosen k={res['k']} gives an average silhouette score of {res['silhouette']:.4f}")
+                st.info("🔍 **Recommendation:** Try the Elbow Method to find a better k value, then use PCA to visualize.")
+                st.write("A silhouette score above 0.5 indicates well-separated clusters.")
+            else:
+                st.error(f"❌ Your chosen k={res['k']} gives a poor silhouette score of {res['silhouette']:.4f}")
+                st.info("🎯 **Recommendation:** Use the Elbow Method above to find the optimal k value.")
+                st.write("Your current k value may not be optimal for this dataset.")
             
             col1, col2, col3 = st.columns(3)
-            col1.metric("Silhouette Score", f"{res['silhouette']:.4f}")
-            col2.metric("Calinski-Harabasz", f"{res['calinski']:.0f}")
-            col3.metric("Davies-Bouldin", f"{res['davies']:.4f}")
+            col1.metric("Silhouette Score", f"{res['silhouette']:.4f}", help="Higher is better (0.5+ is good)")
+            col2.metric("Calinski-Harabasz", f"{res['calinski']:.0f}", help="Higher is better")
+            col3.metric("Davies-Bouldin", f"{res['davies']:.4f}", help="Lower is better")
             
             st.subheader("Clustering Results - PCA Visualization")
             
@@ -175,12 +202,21 @@ if uploaded_file:
             st.dataframe(pd.DataFrame(clv_data), use_container_width=True)
             
             # Add explanation
-            with st.expander("📖 How CLV is calculated"):
+            with st.expander("📖 How to interpret these metrics"):
                 st.markdown("""
-                **Customer Lifetime Value (CLV) Formula:**
-                - CLV = Annual Income × (Spending Score / 100) × 0.1
-                - This estimates the long-term value of each customer
-                - Higher CLV customers should be prioritized for retention
+                **Silhouette Score (0.3-0.5 = Good, 0.5+ = Excellent)**
+                - Measures how similar a customer is to their own cluster vs other clusters
+                - Higher score = better separated clusters
+                
+                **Customer Lifetime Value (CLV)**
+                - Formula: Annual Income × (Spending Score / 100) × 0.1
+                - Estimates long-term value of each customer
+                - Focus retention efforts on high CLV segments
+                
+                **PCA Visualization**
+                - X-axis (PC1): Wealth & Spending Score
+                - Y-axis (PC2): Age & Spending Pattern
+                - Red X marks: Cluster centers
                 """)
             
             st.subheader("Cluster Sizes")
