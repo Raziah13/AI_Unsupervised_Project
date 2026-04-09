@@ -1,4 +1,4 @@
-# COMPLETE WORKING VERSION - With Smart Recommendations
+# COMPLETE WORKING VERSION - With Marketing Budget & Elbow Method after Run
 import os
 
 if os.path.exists('streamlit_app.py'):
@@ -66,40 +66,6 @@ if uploaded_file:
         k_value = st.slider("Number of Clusters (k)", 2, 10, st.session_state.kmeans_k_value, key="kmeans_slider")
         st.session_state.kmeans_k_value = k_value
         
-        # Elbow Method Button - uses slider value as max range
-        st.subheader("Find Optimal Number of Clusters")
-        if st.button(f"Find Optimal k (Elbow Method) - Testing k=2 to {k_value}"):
-            with st.spinner(f"Calculating Elbow Method for k=2 to {k_value}..."):
-                inertias = []
-                K_range = range(2, k_value + 1)
-                for k in K_range:
-                    kmeans_test = KMeans(n_clusters=k, random_state=42, n_init=10)
-                    kmeans_test.fit(X_scaled)
-                    inertias.append(kmeans_test.inertia_)
-                
-                fig_elbow, ax_elbow = plt.subplots(figsize=(10, 6))
-                ax_elbow.plot(K_range, inertias, 'bo-', linewidth=2, markersize=8)
-                ax_elbow.set_xlabel('Number of Clusters (k)', fontsize=12)
-                ax_elbow.set_ylabel('Inertia (Within-cluster sum of squares)', fontsize=12)
-                ax_elbow.set_title(f'Elbow Method for Optimal k (k=2 to {k_value})', fontsize=14, fontweight='bold')
-                
-                # Find the elbow point (where decrease slows down)
-                if len(inertias) >= 2:
-                    # Calculate differences to find elbow
-                    diffs = np.diff(inertias)
-                    if len(diffs) >= 2:
-                        elbow_point = K_range[np.argmin(diffs) + 1]
-                        ax_elbow.axvline(x=elbow_point, color='red', linestyle='--', linewidth=2, label=f'Elbow at k={elbow_point}')
-                        ax_elbow.legend()
-                        st.info(f"📊 The 'elbow' suggests k={elbow_point} is optimal for this dataset.")
-                    else:
-                        ax_elbow.legend()
-                
-                plt.tight_layout()
-                st.pyplot(fig_elbow)
-        
-        st.markdown("---")
-        
         # Run button - results only show after clicking this
         if st.button("Run K-Means", type="primary"):
             with st.spinner("Running K-Means..."):
@@ -131,19 +97,48 @@ if uploaded_file:
             # ========== SMART RECOMMENDATION ==========
             st.subheader("💡 Recommendation")
             
-            # Suggest whether to use Elbow Method or PCA based on silhouette score
             if res['silhouette'] > 0.5:
                 st.success(f"✅ Great! Your chosen k={res['k']} gives a good silhouette score of {res['silhouette']:.4f}")
-                st.info("📊 **Recommendation:** Use PCA Visualization to understand the cluster separation.")
-                st.write("PCA will help you see how well-separated your clusters are in 2D space.")
             elif res['silhouette'] > 0.3:
                 st.warning(f"⚠️ Your chosen k={res['k']} gives an average silhouette score of {res['silhouette']:.4f}")
-                st.info("🔍 **Recommendation:** Try the Elbow Method to find a better k value, then use PCA to visualize.")
-                st.write("A silhouette score above 0.5 indicates well-separated clusters.")
             else:
                 st.error(f"❌ Your chosen k={res['k']} gives a poor silhouette score of {res['silhouette']:.4f}")
-                st.info("🎯 **Recommendation:** Use the Elbow Method above to find the optimal k value.")
-                st.write("Your current k value may not be optimal for this dataset.")
+            
+            # ========== ELBOW METHOD (AFTER RUN) ==========
+            st.subheader("📊 Elbow Method Analysis")
+            with st.spinner("Calculating Elbow Method..."):
+                inertias = []
+                K_range = range(2, 11)
+                for k in K_range:
+                    kmeans_test = KMeans(n_clusters=k, random_state=42, n_init=10)
+                    kmeans_test.fit(X_scaled)
+                    inertias.append(kmeans_test.inertia_)
+                
+                fig_elbow, ax_elbow = plt.subplots(figsize=(10, 6))
+                ax_elbow.plot(K_range, inertias, 'bo-', linewidth=2, markersize=8)
+                ax_elbow.set_xlabel('Number of Clusters (k)', fontsize=12)
+                ax_elbow.set_ylabel('Inertia (Within-cluster sum of squares)', fontsize=12)
+                ax_elbow.set_title('Elbow Method for Optimal k', fontsize=14, fontweight='bold')
+                
+                # Highlight the chosen k
+                ax_elbow.axvline(x=res['k'], color='red', linestyle='--', linewidth=2, label=f'Your chosen k={res["k"]}')
+                
+                # Find the elbow point
+                diffs = np.diff(inertias)
+                if len(diffs) >= 2:
+                    elbow_point = K_range[np.argmin(diffs) + 1]
+                    ax_elbow.axvline(x=elbow_point, color='green', linestyle='--', linewidth=2, label=f'Elbow at k={elbow_point}')
+                
+                ax_elbow.legend()
+                plt.tight_layout()
+                st.pyplot(fig_elbow)
+                
+                if len(diffs) >= 2:
+                    elbow_point = K_range[np.argmin(diffs) + 1]
+                    if elbow_point != res['k']:
+                        st.info(f"📊 The elbow method suggests k={elbow_point} might be better than your chosen k={res['k']}. Try running again with k={elbow_point}.")
+                    else:
+                        st.success(f"✅ Great! Your chosen k={res['k']} matches the elbow method recommendation.")
             
             col1, col2, col3 = st.columns(3)
             col1.metric("Silhouette Score", f"{res['silhouette']:.4f}", help="Higher is better (0.5+ is good)")
@@ -201,29 +196,10 @@ if uploaded_file:
                 })
             st.dataframe(pd.DataFrame(clv_data), use_container_width=True)
             
-            # Add explanation
-            with st.expander("📖 How to interpret these metrics"):
-                st.markdown("""
-                **Silhouette Score (0.3-0.5 = Good, 0.5+ = Excellent)**
-                - Measures how similar a customer is to their own cluster vs other clusters
-                - Higher score = better separated clusters
-                
-                **Customer Lifetime Value (CLV)**
-                - Formula: Annual Income × (Spending Score / 100) × 0.1
-                - Estimates long-term value of each customer
-                - Focus retention efforts on high CLV segments
-                
-                **PCA Visualization**
-                - X-axis (PC1): Wealth & Spending Score
-                - Y-axis (PC2): Age & Spending Pattern
-                - Red X marks: Cluster centers
-                """)
+            # ========== MARKETING BUDGET ALLOCATION (SEPARATE SECTION) ==========
+            st.subheader("📢 Recommended Marketing Budget Allocation")
             
-            st.subheader("Cluster Sizes")
-            cluster_sizes = pd.Series(res['labels']).value_counts().sort_index()
-            st.bar_chart(cluster_sizes)
-            
-            st.subheader("Segment Summary - What Each Cluster Means")
+            # Create segment summary first
             summary_data = []
             for cluster in range(res['k']):
                 cluster_data = res['df'][res['df']['Cluster'] == cluster]
@@ -235,39 +211,100 @@ if uploaded_file:
                 
                 if avg_income > 70 and avg_spending > 60:
                     name = "VIP Premium Customers"
-                    meaning = "High income, high spending - Your best customers"
                 elif avg_income > 70 and avg_spending < 40:
                     name = "Smart Value Shoppers"
-                    meaning = "High income but careful spenders - Focus on value deals"
                 elif avg_income < 40 and avg_spending > 60:
                     name = "Aspiring Trendsetters"
-                    meaning = "Lower income but love spending - Use social media"
                 elif avg_income < 40 and avg_spending < 40:
                     name = "Practical Frugal"
-                    meaning = "Budget conscious - Focus on essential items"
                 elif avg_age < 30 and avg_spending > 60:
                     name = "Young Trend Hunters"
-                    meaning = "Young active spenders - Use influencer marketing"
                 elif avg_age > 50 and avg_income > 60:
                     name = "Established Affluents"
-                    meaning = "Mature stable customers - Focus on quality"
                 elif avg_age > 50 and avg_spending < 40:
                     name = "Comfort Keepers"
-                    meaning = "Senior cautious spenders - Traditional marketing"
                 else:
                     name = "Regular Customers"
-                    meaning = "Balanced customers - Mixed marketing approach"
                 
                 summary_data.append({
                     "Cluster": cluster,
                     "Segment Name": name,
-                    "Size": f"{size} ({pct:.1f}%)",
-                    "Avg Age": f"{avg_age:.0f}",
-                    "Avg Income": f"${avg_income:.0f}K",
-                    "Avg Spending": f"{avg_spending:.0f}",
+                    "Size": size,
+                    "Pct": pct,
+                    "Avg Age": avg_age,
+                    "Avg Income": avg_income,
+                    "Avg Spending": avg_spending
+                })
+            
+            # Marketing budget allocation
+            budget_data = []
+            total_budget = 100
+            remaining_budget = total_budget
+            
+            for seg in summary_data:
+                if "VIP" in seg['Segment Name'] or "Premium" in seg['Segment Name']:
+                    budget_pct = 35
+                elif "Trend" in seg['Segment Name'] or "Young" in seg['Segment Name']:
+                    budget_pct = 25
+                elif "Value" in seg['Segment Name'] or "Smart" in seg['Segment Name']:
+                    budget_pct = 20
+                elif "Frugal" in seg['Segment Name'] or "Practical" in seg['Segment Name']:
+                    budget_pct = 10
+                elif "Comfort" in seg['Segment Name'] or "Senior" in seg['Segment Name']:
+                    budget_pct = 5
+                else:
+                    budget_pct = 5
+                
+                budget_data.append({
+                    'Segment': seg['Segment Name'],
+                    'Customers': seg['Size'],
+                    'Percentage of Customers': f"{seg['Pct']:.1f}%",
+                    'Marketing Budget': f"{budget_pct}%",
+                    'Priority': 'High' if budget_pct >= 20 else 'Medium' if budget_pct >= 10 else 'Low'
+                })
+            
+            st.dataframe(pd.DataFrame(budget_data), use_container_width=True)
+            
+            # Display budget chart
+            budget_chart_data = {item['Segment']: int(item['Marketing Budget'].replace('%', '')) for item in budget_data}
+            st.bar_chart(pd.Series(budget_chart_data))
+            
+            st.info("💡 **Marketing Strategy Tip:** Allocate more budget to high-value segments (VIP, Trendsetters) for maximum ROI. Focus retention efforts on these groups.")
+            
+            st.subheader("Cluster Sizes")
+            cluster_sizes = pd.Series(res['labels']).value_counts().sort_index()
+            st.bar_chart(cluster_sizes)
+            
+            st.subheader("Segment Summary - What Each Cluster Means")
+            final_summary = []
+            for seg in summary_data:
+                if seg['Avg Income'] > 70 and seg['Avg Spending'] > 60:
+                    meaning = "High income, high spending - Your best customers"
+                elif seg['Avg Income'] > 70 and seg['Avg Spending'] < 40:
+                    meaning = "High income but careful spenders - Focus on value deals"
+                elif seg['Avg Income'] < 40 and seg['Avg Spending'] > 60:
+                    meaning = "Lower income but love spending - Use social media"
+                elif seg['Avg Income'] < 40 and seg['Avg Spending'] < 40:
+                    meaning = "Budget conscious - Focus on essential items"
+                elif seg['Avg Age'] < 30 and seg['Avg Spending'] > 60:
+                    meaning = "Young active spenders - Use influencer marketing"
+                elif seg['Avg Age'] > 50 and seg['Avg Income'] > 60:
+                    meaning = "Mature stable customers - Focus on quality"
+                elif seg['Avg Age'] > 50 and seg['Avg Spending'] < 40:
+                    meaning = "Senior cautious spenders - Traditional marketing"
+                else:
+                    meaning = "Balanced customers - Mixed marketing approach"
+                
+                final_summary.append({
+                    "Cluster": seg['Cluster'],
+                    "Segment Name": seg['Segment Name'],
+                    "Size": f"{seg['Size']} ({seg['Pct']:.1f}%)",
+                    "Avg Age": f"{seg['Avg Age']:.0f}",
+                    "Avg Income": f"${seg['Avg Income']:.0f}K",
+                    "Avg Spending": f"{seg['Avg Spending']:.0f}",
                     "What This Means": meaning
                 })
-            st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
+            st.dataframe(pd.DataFrame(final_summary), use_container_width=True)
         else:
             st.info("👈 Click the 'Run K-Means' button to see results")
     
